@@ -89,7 +89,7 @@ class BlenderPCBAnimator:
         if prefs:
             cprefs = prefs.preferences
             cprefs.get_devices()
-            for device_type in ("METAL", "CUDA", "OPTIX", "HIP"):
+            for device_type in ("METAL", "CUDA", "OPTIX", "HIP", "ONEAPI"):
                 try:
                     cprefs.compute_device_type = device_type
                     gpus = [d for d in cprefs.devices if d.type == device_type]
@@ -634,7 +634,7 @@ class BlenderPCBAnimator:
         cmd = [
             FFMPEG, "-y",
             "-framerate", str(self.fps),
-            "-i", f"{temp_dir}/frame_%04d.png",
+            "-i", os.path.join(temp_dir, "frame_%04d.png").replace("\\", "/"),
             "-c:v", "libx264",
             "-profile:v", "high",
             "-crf", "17",

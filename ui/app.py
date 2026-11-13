@@ -8,6 +8,7 @@ import re
 import time
 import json
 import base64
+import tempfile
 import threading
 import subprocess
 
@@ -43,12 +44,13 @@ class DesktopApi:
 
         last_preview_b64 = None
         last_preview_path = None
+        tmp_dir = tempfile.gettempdir()
         candidates = [
-            "/tmp/preview_gui_blender.png",
-            "/tmp/preview_gui_kicad.png",
-            "/tmp/test_blender_still.png",
-            "/tmp/test_kicad_still.png",
-            "/tmp/preview_iluminacao.png"
+            os.path.join(tmp_dir, "preview_gui_blender.png"),
+            os.path.join(tmp_dir, "preview_gui_kicad.png"),
+            os.path.join(tmp_dir, "test_blender_still.png"),
+            os.path.join(tmp_dir, "test_kicad_still.png"),
+            os.path.join(tmp_dir, "preview_iluminacao.png")
         ]
         for c in candidates:
             if os.path.exists(c):
@@ -83,13 +85,32 @@ class DesktopApi:
             pass
 
         # Fallback AppleScript no macOS
+        if sys.platform == "darwin":
+            try:
+                scpt = 'POSIX path of (choose file with prompt "Selecione o arquivo da placa KiCad (.kicad_pcb)" of type {"kicad_pcb", "public.data"})'
+                r = subprocess.run(["osascript", "-e", scpt], capture_output=True, text=True)
+                if r.returncode == 0 and r.stdout.strip():
+                    return r.stdout.strip()
+            except Exception:
+                pass
+
+        # Fallback universal Tkinter (Windows, Linux, macOS)
         try:
-            scpt = 'POSIX path of (choose file with prompt "Selecione o arquivo da placa KiCad (.kicad_pcb)" of type {"kicad_pcb", "public.data"})'
-            r = subprocess.run(["osascript", "-e", scpt], capture_output=True, text=True)
-            if r.returncode == 0 and r.stdout.strip():
-                return r.stdout.strip()
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            f_path = filedialog.askopenfilename(
+                title="Selecione o arquivo da placa KiCad (.kicad_pcb)",
+                filetypes=[("KiCad PCB", "*.kicad_pcb"), ("Todos os arquivos", "*.*")]
+            )
+            root.destroy()
+            if f_path:
+                return f_path
         except Exception:
             pass
+
         return None
 
     def browse_output_dir(self):
@@ -102,19 +123,43 @@ class DesktopApi:
             pass
 
         # Fallback AppleScript no macOS
+        if sys.platform == "darwin":
+            try:
+                scpt = 'POSIX path of (choose folder with prompt "Selecione a pasta para exportação das animações")'
+                r = subprocess.run(["osascript", "-e", scpt], capture_output=True, text=True)
+                if r.returncode == 0 and r.stdout.strip():
+                    return r.stdout.strip()
+            except Exception:
+                pass
+
+        # Fallback universal Tkinter (Windows, Linux, macOS)
         try:
-            scpt = 'POSIX path of (choose folder with prompt "Selecione a pasta para exportação das animações")'
-            r = subprocess.run(["osascript", "-e", scpt], capture_output=True, text=True)
-            if r.returncode == 0 and r.stdout.strip():
-                return r.stdout.strip()
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            d_path = filedialog.askdirectory(title="Selecione a pasta para exportação das animações")
+            root.destroy()
+            if d_path:
+                return d_path
         except Exception:
             pass
+
         return None
 
     def open_path(self, path):
         if path and os.path.exists(path):
-            subprocess.run(["open", path])
-            return True
+            try:
+                if sys.platform == "win32":
+                    os.startfile(os.path.normpath(path))
+                elif sys.platform == "darwin":
+                    subprocess.run(["open", path])
+                else:
+                    subprocess.run(["xdg-open", path])
+                return True
+            except Exception:
+                pass
         return False
 
     def _parse_and_emit_progress(self, line):
@@ -151,7 +196,7 @@ class DesktopApi:
         pcb = params.get("pcb")
         backend = params.get("backend", "blender")
         res = params.get("res", "1080p")
-        preview_out = f"/tmp/preview_gui_{backend}.png"
+        preview_out = os.path.join(tempfile.gettempdir(), f"preview_gui_{backend}.png")
 
         cmd = [
             PYTHON_BIN, MAIN_SCRIPT,

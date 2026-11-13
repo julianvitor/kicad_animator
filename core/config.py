@@ -6,6 +6,7 @@ import os
 import sys
 import re
 import shutil
+import subprocess
 
 # ---------------------------------------------------------------------------
 # Verificação de Runtime do Blender (bpy)
@@ -18,54 +19,133 @@ except ImportError:
     HAS_BPY = False
 
 # ---------------------------------------------------------------------------
-# Localização de Binários Essenciais
+# Localização de Binários Essenciais (Multiplataforma: Linux, Windows, macOS)
 # ---------------------------------------------------------------------------
 def find_binary(name, extra_paths=None):
     found = shutil.which(name)
     if found:
         return found
+    if sys.platform == "win32" and not name.lower().endswith(".exe"):
+        found = shutil.which(f"{name}.exe")
+        if found:
+            return found
     if extra_paths:
         for p in extra_paths:
-            if os.path.exists(p):
+            if not p:
+                continue
+            if "*" in p:
+                import glob
+                matches = glob.glob(p)
+                if matches:
+                    return sorted(matches, reverse=True)[0]
+            elif os.path.exists(p):
                 return p
     return None
 
+prog_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+prog_files_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+local_app_data = os.environ.get("LOCALAPPDATA", "")
+
 KICAD_CLI_PATHS = [
+    # macOS
     "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+    os.path.expanduser("~/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"),
+    # Linux
     "/usr/bin/kicad-cli",
     "/usr/local/bin/kicad-cli",
+    "/app/bin/kicad-cli",
+    # Windows
+    os.path.join(prog_files, "KiCad", "*", "bin", "kicad-cli.exe"),
+    os.path.join(prog_files, "KiCad", "bin", "kicad-cli.exe"),
+    os.path.join(prog_files_x86, "KiCad", "*", "bin", "kicad-cli.exe"),
+    os.path.join(prog_files_x86, "KiCad", "bin", "kicad-cli.exe"),
 ]
 KICAD_CLI = find_binary("kicad-cli", KICAD_CLI_PATHS)
 
 FFMPEG_PATHS = [
+    # macOS
     "/opt/homebrew/bin/ffmpeg",
     "/usr/local/bin/ffmpeg",
-    "/usr/bin/ffmpeg"
+    # Linux
+    "/usr/bin/ffmpeg",
+    "/usr/local/bin/ffmpeg",
+    "/snap/bin/ffmpeg",
+    # Windows
+    r"C:\ffmpeg\bin\ffmpeg.exe",
+    os.path.join(prog_files, "ffmpeg", "bin", "ffmpeg.exe"),
+    os.path.join(prog_files, "ffmpeg", "ffmpeg.exe"),
+    os.path.join(local_app_data, "Microsoft", "WinGet", "Packages", "*", "*ffmpeg.exe") if local_app_data else None,
 ]
 FFMPEG = find_binary("ffmpeg", FFMPEG_PATHS)
 
 BLENDER_PATHS = [
+    # macOS
     "/Applications/Blender.app/Contents/MacOS/Blender",
     os.path.expanduser("~/Applications/Blender.app/Contents/MacOS/Blender"),
+    # Linux
     "/usr/bin/blender",
     "/usr/local/bin/blender",
-    "/snap/bin/blender"
+    "/snap/bin/blender",
+    # Windows
+    os.path.join(prog_files, "Blender Foundation", "Blender *", "blender.exe"),
+    os.path.join(prog_files, "Blender Foundation", "Blender", "blender.exe"),
+    r"C:\Blender\blender.exe",
 ]
 BLENDER_BIN = find_binary("blender", BLENDER_PATHS)
 
 UV_PATHS = [
     os.path.expanduser("~/.local/bin/uv"),
+    os.path.expanduser("~/.cargo/bin/uv"),
     "/opt/homebrew/bin/uv",
-    "/usr/local/bin/uv"
+    "/usr/local/bin/uv",
+    os.path.join(local_app_data, "Programs", "uv", "uv.exe") if local_app_data else None,
 ]
 UV_BIN = find_binary("uv", UV_PATHS)
 
+POETRY_PATHS = [
+    os.path.expanduser("~/.local/bin/poetry"),
+    os.path.expanduser("~/.poetry/bin/poetry"),
+    "/opt/homebrew/bin/poetry",
+    "/usr/local/bin/poetry",
+    os.path.join(os.environ.get("APPDATA", ""), "Python", "Scripts", "poetry.exe") if os.environ.get("APPDATA") else None,
+]
+POETRY_BIN = find_binary("poetry", POETRY_PATHS)
+
 def get_best_python():
-    """Retorna o executável do Python no .venv local (que possui bpy e pywebview) ou o sys.executable."""
+    """Retorna o executável Python no ambiente Poetry/.venv local ou sys.executable."""
+    try:
+        import webview
+        return sys.executable
+    except ImportError:
+        pass
+
     script_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    venv_py = os.path.join(script_dir, ".venv", "bin", "python")
-    if os.path.exists(venv_py):
-        return venv_py
+    
+    # Verifica .venv local (Unix: bin/python, Windows: Scripts/python.exe)
+    if sys.platform == "win32":
+        venv_candidates = [
+            os.path.join(script_dir, ".venv", "Scripts", "python.exe"),
+            os.path.join(script_dir, ".venv", "python.exe")
+        ]
+    else:
+        venv_candidates = [
+            os.path.join(script_dir, ".venv", "bin", "python"),
+            os.path.join(script_dir, ".venv", "bin", "python3")
+        ]
+
+    for p in venv_candidates:
+        if os.path.exists(p):
+            return p
+
+    # Verifica ambiente Poetry ativo via CLI
+    if POETRY_BIN:
+        try:
+            res = subprocess.run([POETRY_BIN, "env", "info", "-e"], capture_output=True, text=True, cwd=script_dir)
+            if res.returncode == 0 and res.stdout.strip() and os.path.exists(res.stdout.strip()):
+                return res.stdout.strip()
+        except Exception:
+            pass
+
     return sys.executable
 
 PYTHON_BIN = get_best_python()

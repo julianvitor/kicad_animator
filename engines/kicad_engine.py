@@ -303,7 +303,7 @@ class KiCadNativePCBAnimator:
         cmd = [
             FFMPEG, "-y",
             "-framerate", str(self.fps),
-            "-i", f"{temp_dir}/frame_%04d.png",
+            "-i", os.path.join(temp_dir, "frame_%04d.png").replace("\\", "/"),
             "-filter_complex", f"color=c=0x0f172a:s={self.width}x{self.height}:d={duration:.2f}:r={self.fps}[bg];[bg][0:v]overlay=x=(W-w)/2:y=(H-h)/2:shortest=1:format=auto[v]",
             "-map", "[v]",
             "-r", str(self.fps),

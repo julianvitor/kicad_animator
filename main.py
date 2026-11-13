@@ -19,18 +19,23 @@ import argparse
 import tempfile
 import subprocess
 
-# Auto-elevação para o .venv local se o Python atual não possuir as dependências (bpy/pywebview)
+# Auto-elevação para o ambiente Poetry / .venv local se o Python atual não possuir as dependências (bpy/pywebview)
 script_dir = os.path.dirname(os.path.abspath(__file__))
-venv_py = os.path.join(script_dir, ".venv", "bin", "python")
-if os.path.exists(venv_py) and sys.executable != venv_py:
-    # Se chamado com --gui ou sem argumentos, precisa de pywebview; se chamado com blender, precisa de bpy
+is_win = sys.platform == "win32"
+venv_candidates = [
+    os.path.join(script_dir, ".venv", "Scripts", "python.exe") if is_win else os.path.join(script_dir, ".venv", "bin", "python"),
+    os.path.join(script_dir, ".venv", "bin", "python3")
+]
+target_py = next((p for p in venv_candidates if os.path.exists(p)), None)
+
+if target_py and os.path.abspath(sys.executable) != os.path.abspath(target_py):
     try:
         import webview
     except ImportError:
-        os.execv(venv_py, [venv_py, os.path.abspath(__file__)] + sys.argv[1:])
+        sys.exit(subprocess.call([target_py, os.path.abspath(__file__)] + sys.argv[1:]))
 
 from core.config import (
-    KICAD_CLI, FFMPEG, BLENDER_BIN, UV_BIN, HAS_BPY, STYLE_DESCRIPTIONS
+    KICAD_CLI, FFMPEG, BLENDER_BIN, UV_BIN, POETRY_BIN, HAS_BPY, STYLE_DESCRIPTIONS
 )
 from core.parser import PCBMetaParser
 from core.jobs import resolve_jobs, prompt_terminal_interactive
@@ -75,8 +80,12 @@ def main():
 
     # 2. Verificação de Runtime para o Blender (se backend == "blender"):
     if args.backend == "blender" and not HAS_BPY:
-        if os.path.exists(venv_py):
-            cmd = [venv_py, os.path.abspath(__file__)] + raw_args
+        if target_py and os.path.exists(target_py) and os.path.abspath(sys.executable) != os.path.abspath(target_py):
+            cmd = [target_py, os.path.abspath(__file__)] + raw_args
+            sys.exit(subprocess.call(cmd))
+
+        if POETRY_BIN and "POETRY_ACTIVE" not in os.environ:
+            cmd = [POETRY_BIN, "run", "python", os.path.abspath(__file__)] + raw_args
             sys.exit(subprocess.call(cmd))
 
         if UV_BIN:
