@@ -68,30 +68,50 @@ class BlenderPCBAnimator:
         self.comp_roots = []
         self.board_objs = []
         self.total_frames = 0
+        self.gpu_info = "Detectando..."
 
     def _setup_scene(self):
         # Reinicia a cena com cena vazia
         bpy.ops.wm.read_factory_settings(use_empty=True)
         self.scene = bpy.context.scene
 
+        # Configurações de Aceleração por Hardware GPU
+        self.gpu_info = "CPU (Fallback)"
+        try:
+            bpy.context.preferences.system.use_gpu_subdivision = True
+        except Exception:
+            pass
+
+        sys_backend = getattr(bpy.context.preferences.system, "gpu_backend", "GPU")
+
+        # Configura e ativa dispositivos GPU em Cycles e EEVEE
+        prefs = bpy.context.preferences.addons.get("cycles")
+        if prefs:
+            cprefs = prefs.preferences
+            cprefs.get_devices()
+            for device_type in ("METAL", "CUDA", "OPTIX", "HIP"):
+                try:
+                    cprefs.compute_device_type = device_type
+                    gpus = [d for d in cprefs.devices if d.type == device_type]
+                    if gpus:
+                        for d in cprefs.devices:
+                            d.use = (d.type == device_type)
+                        gpu_names = ", ".join([d.name for d in gpus])
+                        self.gpu_info = f"{gpu_names} [{device_type}]"
+                        break
+                except Exception:
+                    pass
+
         # Configurações do Motor de Render
         if self.engine == "cycles":
             self.scene.render.engine = "CYCLES"
+            self.scene.cycles.device = "GPU"
             self.scene.cycles.samples = self.samples
             self.scene.cycles.use_denoising = True
-            prefs = bpy.context.preferences.addons.get("cycles")
-            if prefs:
-                cprefs = prefs.preferences
-                cprefs.get_devices()
-                for device_type in ("METAL", "CUDA", "OPTIX", "HIP"):
-                    try:
-                        cprefs.compute_device_type = device_type
-                        self.scene.cycles.device = "GPU"
-                        break
-                    except Exception:
-                        pass
         else:
             self.scene.render.engine = "BLENDER_EEVEE"
+            if self.gpu_info == "CPU (Fallback)":
+                self.gpu_info = f"Hardware Rasterization ({sys_backend})"
 
         self.scene.render.resolution_x = self.width
         self.scene.render.resolution_y = self.height
@@ -519,22 +539,23 @@ class BlenderPCBAnimator:
         if frame_idx is None or frame_idx < 0:
             frame_idx = int(self.act3_end + (self.total_frames - self.act3_end) * 0.5) if self.mode != "bottom" else int(self.act1_end * 0.8)
 
-        print("\n" + "="*60, flush=True)
-        print("📸 RENDERIZANDO QUADRO ESTÁTICO (BLENDER / BPY)", flush=True)
-        print("="*60, flush=True)
-        print(f"📁 Projeto PCB   : {os.path.basename(self.pcb_path)}", flush=True)
-        print(f"🖼️ Quadro       : #{frame_idx} de {total_frames}", flush=True)
-        print(f"⚙️ Motor Render  : {self.engine.upper()} (samples: {self.samples})", flush=True)
-        print(f"💡 Luz           : Intensidade {self.light_intensity:.1f}x", flush=True)
-        print(f"📺 Resolução     : {self.width}×{self.height}", flush=True)
-        print("="*60 + "\n", flush=True)
-
         pbar = RenderProgressBar(1, prefix="Blender Preview")
         pbar.update(0, status="Configurando cena e shaders no Blender...")
         print("📦 Configurando cena e shaders no Blender...", flush=True)
         self._setup_scene()
         self._animate_camera()
         self._animate_components()
+
+        print("\n" + "="*60, flush=True)
+        print("📸 RENDERIZANDO QUADRO ESTÁTICO (BLENDER / BPY)", flush=True)
+        print("="*60, flush=True)
+        print(f"📁 Projeto PCB   : {os.path.basename(self.pcb_path)}", flush=True)
+        print(f"🖼️ Quadro       : #{frame_idx} de {total_frames}", flush=True)
+        print(f"⚙️ Motor Render  : {self.engine.upper()} (samples: {self.samples})", flush=True)
+        print(f"🚀 Aceleração GPU: {self.gpu_info}", flush=True)
+        print(f"💡 Luz           : Intensidade {self.light_intensity:.1f}x", flush=True)
+        print(f"📺 Resolução     : {self.width}×{self.height}", flush=True)
+        print("="*60 + "\n", flush=True)
 
         os.makedirs(os.path.dirname(os.path.abspath(out_file)), exist_ok=True)
         self.scene.render.filepath = os.path.abspath(out_file)
@@ -553,6 +574,11 @@ class BlenderPCBAnimator:
         try:
             total_frames = self._calculate_timeline()
 
+            print("📦 Configurando cena, shaders e keyframes procedurais no Blender...", flush=True)
+            self._setup_scene()
+            self._animate_camera()
+            self._animate_components()
+
             print("\n" + "="*60, flush=True)
             print("🚀 INICIANDO RENDERIZAÇÃO DA ANIMAÇÃO 3D (BLENDER / BPY)", flush=True)
             print("="*60, flush=True)
@@ -562,14 +588,10 @@ class BlenderPCBAnimator:
             print(f"🎨 Estilo        : {STYLE_DESCRIPTIONS.get(self.style, self.style)}", flush=True)
             print(f"🔄 Modo          : {self.mode.upper()}", flush=True)
             print(f"⚙️ Motor Render  : {self.engine.upper()} (samples: {self.samples})", flush=True)
+            print(f"🚀 Aceleração GPU: {self.gpu_info}", flush=True)
             print(f"📺 Resolução     : {self.width}×{self.height} @ {self.fps} fps", flush=True)
             print(f"⏱️ Duração       : {total_frames} frames ({total_frames/self.fps:.1f} segundos)", flush=True)
             print("="*60 + "\n", flush=True)
-
-            print("📦 Configurando cena, shaders e keyframes procedurais no Blender...", flush=True)
-            self._setup_scene()
-            self._animate_camera()
-            self._animate_components()
 
             if self.save_blend:
                 blend_file = os.path.abspath(self.save_blend)
