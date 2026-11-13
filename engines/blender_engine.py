@@ -11,7 +11,7 @@ import tempfile
 import subprocess
 
 from core.config import (
-    HAS_BPY, KICAD_CLI, FFMPEG, RES_MAP, STYLE_DESCRIPTIONS
+    HAS_BPY, KICAD_CLI, FFMPEG, RES_MAP, STYLE_DESCRIPTIONS, categorize_ref
 )
 from core.progress import RenderProgressBar
 
@@ -118,6 +118,22 @@ class BlenderPCBAnimator:
         # Importa GLB do KiCad
         bpy.ops.import_scene.gltf(filepath=self.glb_path)
 
+        # Desvincula container raiz criado pelo importador glTF (ex: Node_0)
+        # mantendo matrizes de mundo para que componentes e camadas da placa fiquem no nível raiz da cena
+        gltf_roots = [
+            obj for obj in bpy.data.objects
+            if obj.parent is None and obj.type == "EMPTY" and any(
+                ("pcb" in (c.data.name.lower() if c.data else "") or "soldermask" in (c.data.name.lower() if c.data else ""))
+                for c in obj.children
+            )
+        ]
+        for root in gltf_roots:
+            for child in list(root.children):
+                mat = child.matrix_world.copy()
+                child.parent = None
+                child.matrix_world = mat
+            bpy.data.objects.remove(root, do_unlink=True)
+
         # Localiza o mesh da placa PCB para obter centro e dimensões exatas em metros
         pcb_mesh_objs = [obj for obj in bpy.data.objects if obj.type == "MESH" and obj.data and "_pcb" in obj.data.name.lower()]
         if pcb_mesh_objs:
@@ -143,6 +159,7 @@ class BlenderPCBAnimator:
         root_objs = [obj for obj in bpy.data.objects if obj.parent is None]
         for obj in root_objs:
             obj.location -= self.board_center
+        bpy.context.view_layer.update()
 
         self._setup_lighting_and_materials()
         self._setup_camera()
@@ -389,6 +406,7 @@ class BlenderPCBAnimator:
     def _animate_components(self):
         pcb_keywords = ("pcb", "soldermask", "silkscreen", "pad", "copper", "track", "via")
         self.comp_roots = []
+        self.board_objs = []
         for obj in bpy.data.objects:
             if obj.parent is None and obj.type in ("MESH", "EMPTY") and obj != self.cam_obj and obj != self.target:
                 oname = obj.name.lower()
@@ -402,10 +420,9 @@ class BlenderPCBAnimator:
         bounce_frames = int(0.14 * self.fps)
 
         for obj in self.comp_roots:
-            bbox = [obj.matrix_world @ Vector(c) for c in obj.bound_box]
-            obj_x = sum(c.x for c in bbox) / 8.0
-            obj_y = sum(c.y for c in bbox) / 8.0
-            obj_z = sum(c.z for c in bbox) / 8.0
+            orig_loc = obj.location.copy()
+            orig_scale = obj.scale.copy()
+            obj_z = obj.location.z
 
             is_bottom = obj_z < 0.0
 
@@ -414,54 +431,70 @@ class BlenderPCBAnimator:
             if not is_bottom and self.mode == "bottom":
                 continue
 
-            if self.style == "rain":
-                norm = (obj_x - (-self.board_w / 2.0)) / max(0.01, self.board_w)
-            elif self.style == "radial":
-                dist = math.hypot(obj_x, obj_y)
-                norm = dist / max(0.01, math.hypot(self.board_w / 2.0, self.board_h / 2.0))
-            elif self.style == "vortex":
-                dist = math.hypot(obj_x, obj_y)
-                norm_r = dist / max(0.01, math.hypot(self.board_w / 2.0, self.board_h / 2.0))
-                norm_x = (obj_x - (-self.board_w / 2.0)) / max(0.01, self.board_w)
-                norm = 0.6 * norm_x + 0.4 * norm_r
+            # Prioriza tempo pré-calculado pelo footprint KiCad se disponível
+            if hasattr(self, "spawn_timings") and obj.name in self.spawn_timings and self.spawn_timings[obj.name] is not None:
+                spawn_f = self.spawn_timings[obj.name]
             else:
-                norm = (obj_x - (-self.board_w / 2.0)) / max(0.01, self.board_w)
-
-            norm = max(0.0, min(1.0, norm))
-            jitter = random.uniform(-4.0, 4.0)
-
-            if is_bottom:
-                if self.mode == "both":
-                    spawn_f = 15.0 + norm * (self.act1_end - 45.0) + jitter
+                obj_x = obj.location.x
+                obj_y = obj.location.y
+                if self.style == "rain":
+                    norm = (obj_x - (-self.board_w / 2.0)) / max(0.01, self.board_w)
+                elif self.style == "radial":
+                    dist = math.hypot(obj_x, obj_y)
+                    norm = dist / max(0.01, math.hypot(self.board_w / 2.0, self.board_h / 2.0))
+                elif self.style == "assembly":
+                    cat = categorize_ref(obj.name)
+                    norm_x = (obj_x - (-self.board_w / 2.0)) / max(0.01, self.board_w)
+                    if cat == 1:
+                        norm = 0.0 + 0.30 * norm_x
+                    elif cat == 2:
+                        norm = 0.35 + 0.30 * norm_x
+                    else:
+                        norm = 0.70 + 0.30 * norm_x
+                elif self.style == "vortex":
+                    dist = math.hypot(obj_x, obj_y)
+                    norm_r = dist / max(0.01, math.hypot(self.board_w / 2.0, self.board_h / 2.0))
+                    norm_x = (obj_x - (-self.board_w / 2.0)) / max(0.01, self.board_w)
+                    norm = 0.6 * norm_x + 0.4 * norm_r
                 else:
-                    spawn_f = 20.0 + norm * (self.act1_end - 40.0) + jitter
-            else:
-                if self.mode == "both":
-                    spawn_f = self.act2_end + 15.0 + norm * (self.act3_end - self.act2_end - 45.0) + jitter
+                    norm = (obj_x - (-self.board_w / 2.0)) / max(0.01, self.board_w)
+
+                norm = max(0.0, min(1.0, norm))
+                jitter = random.uniform(-4.0, 4.0)
+
+                if is_bottom:
+                    if self.mode == "both":
+                        spawn_f = 15.0 + norm * (self.act1_end - 45.0) + jitter
+                    else:
+                        spawn_f = 20.0 + norm * (self.act1_end - 40.0) + jitter
                 else:
-                    spawn_f = 20.0 + norm * (self.act3_end - 40.0) + jitter
+                    if self.mode == "both":
+                        spawn_f = self.act2_end + 15.0 + norm * (self.act3_end - self.act2_end - 45.0) + jitter
+                    else:
+                        spawn_f = 20.0 + norm * (self.act3_end - 40.0) + jitter
 
             spawn_f = max(1.0, spawn_f)
             land_f = spawn_f + fall_frames
             bounce_f = land_f + bounce_frames
 
-            orig_loc = obj.location.copy()
-            orig_scale = obj.scale.copy()
             sign = -1.0 if is_bottom else 1.0
+            drop_height = max(0.05, min(0.12, self.board_w * 0.7))
 
-            # 1. Invisível antes do spawn
+            # 1. Invisível desde o frame 1 até imediatamente antes do spawn
             obj.scale = Vector((0.0, 0.0, 0.0))
-            obj.keyframe_insert(data_path="scale", frame=max(1, int(spawn_f - 1)))
+            obj.keyframe_insert(data_path="scale", frame=1)
+            if int(spawn_f - 1) > 1:
+                obj.keyframe_insert(data_path="scale", frame=int(spawn_f - 1))
 
-            # 2. Spawn no ar
-            obj.scale = orig_scale
+            # 2. Posição no ar e visibilidade no frame de spawn
+            spawn_loc = orig_loc + Vector((0, 0, sign * drop_height))
             if self.style == "vortex":
-                v_radius = 0.025
+                v_radius = min(0.035, self.board_w * 0.3)
                 v_theta = 3.5 * math.pi
-                obj.location = orig_loc + Vector((v_radius * math.cos(v_theta), v_radius * math.sin(v_theta), sign * 0.08))
-            else:
-                obj.location = orig_loc + Vector((0, 0, sign * 0.08))
+                spawn_loc += Vector((v_radius * math.cos(v_theta), v_radius * math.sin(v_theta), 0))
 
+            obj.location = spawn_loc
+            obj.scale = orig_scale
             obj.keyframe_insert(data_path="scale", frame=int(spawn_f))
             obj.keyframe_insert(data_path="location", frame=int(spawn_f))
 
@@ -470,14 +503,16 @@ class BlenderPCBAnimator:
             obj.keyframe_insert(data_path="location", frame=int(land_f))
 
             # 4. Rebote elástico
-            bounce_height = 0.002
+            bounce_height = 0.0025
             obj.location = orig_loc + Vector((0, 0, sign * bounce_height))
             mid_bounce = int((land_f + bounce_f) / 2.0)
             obj.keyframe_insert(data_path="location", frame=mid_bounce)
 
-            # 5. Repouso final
+            # 5. Repouso final no lugar exato da montagem
             obj.location = orig_loc
             obj.keyframe_insert(data_path="location", frame=int(bounce_f))
+            obj.keyframe_insert(data_path="location", frame=self.total_frames)
+            obj.keyframe_insert(data_path="scale", frame=self.total_frames)
 
     def render_single_frame(self, frame_idx, out_file):
         total_frames = self._calculate_timeline()
