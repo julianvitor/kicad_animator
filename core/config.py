@@ -113,15 +113,9 @@ POETRY_BIN = find_binary("poetry", POETRY_PATHS)
 
 def get_best_python():
     """Retorna o executável Python no ambiente Poetry/.venv local ou sys.executable."""
-    try:
-        import webview
-        return sys.executable
-    except ImportError:
-        pass
-
     script_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     
-    # Verifica .venv local (Unix: bin/python, Windows: Scripts/python.exe)
+    # 1. Prioriza o .venv local do projeto (Unix: bin/python, Windows: Scripts/python.exe)
     if sys.platform == "win32":
         venv_candidates = [
             os.path.join(script_dir, ".venv", "Scripts", "python.exe"),
@@ -137,14 +131,21 @@ def get_best_python():
         if os.path.exists(p):
             return p
 
-    # Verifica ambiente Poetry ativo via CLI
+    # 2. Verifica ambiente Poetry ativo via CLI
     if POETRY_BIN:
         try:
-            res = subprocess.run([POETRY_BIN, "env", "info", "-e"], capture_output=True, text=True, cwd=script_dir)
+            res = subprocess.run([POETRY_BIN, "--directory", script_dir, "env", "info", "-e"], capture_output=True, text=True, cwd=script_dir)
             if res.returncode == 0 and res.stdout.strip() and os.path.exists(res.stdout.strip()):
                 return res.stdout.strip()
         except Exception:
             pass
+
+    # 3. Fallback: se o Python atual tem as dependências
+    try:
+        import webview
+        return sys.executable
+    except ImportError:
+        pass
 
     return sys.executable
 

@@ -30,9 +30,10 @@ target_py = next((p for p in venv_candidates if os.path.exists(p)), None)
 
 if target_py and os.path.abspath(sys.executable) != os.path.abspath(target_py):
     try:
+        import bpy
         import webview
     except ImportError:
-        sys.exit(subprocess.call([target_py, os.path.abspath(__file__)] + sys.argv[1:]))
+        sys.exit(subprocess.call([target_py, os.path.abspath(__file__)] + sys.argv[1:], cwd=script_dir))
 
 from core.config import (
     KICAD_CLI, FFMPEG, BLENDER_BIN, UV_BIN, POETRY_BIN, HAS_BPY, STYLE_DESCRIPTIONS
@@ -82,19 +83,19 @@ def main():
     if args.backend == "blender" and not HAS_BPY:
         if target_py and os.path.exists(target_py) and os.path.abspath(sys.executable) != os.path.abspath(target_py):
             cmd = [target_py, os.path.abspath(__file__)] + raw_args
-            sys.exit(subprocess.call(cmd))
+            sys.exit(subprocess.call(cmd, cwd=script_dir))
 
         if POETRY_BIN and "POETRY_ACTIVE" not in os.environ:
-            cmd = [POETRY_BIN, "run", "python", os.path.abspath(__file__)] + raw_args
-            sys.exit(subprocess.call(cmd))
+            cmd = [POETRY_BIN, "--directory", script_dir, "run", "python", os.path.abspath(__file__)] + raw_args
+            sys.exit(subprocess.call(cmd, cwd=script_dir))
 
         if UV_BIN:
-            cmd = [UV_BIN, "run", "--python", "3.13", "--with", "bpy", "python", os.path.abspath(__file__)] + raw_args
-            sys.exit(subprocess.call(cmd))
+            cmd = [UV_BIN, "run", "--directory", script_dir, "--python", "3.13", "--with", "bpy", "python", os.path.abspath(__file__)] + raw_args
+            sys.exit(subprocess.call(cmd, cwd=script_dir))
 
         if BLENDER_BIN:
             cmd = [BLENDER_BIN, "--background", "--python", os.path.abspath(__file__), "--"] + raw_args
-            sys.exit(subprocess.call(cmd))
+            sys.exit(subprocess.call(cmd, cwd=script_dir))
 
         print("\n❌ Erro: A biblioteca 'bpy' ou o Blender não foram encontrados para o motor Blender.", file=sys.stderr)
         print("💡 Dica: Você pode executar com o motor KiCad Nativo adicionando '--backend kicad'.\n", file=sys.stderr)

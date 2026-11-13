@@ -233,6 +233,7 @@ class DesktopApi:
             try:
                 proc = subprocess.Popen(
                     cmd,
+                    cwd=ROOT_DIR,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
@@ -313,6 +314,7 @@ class DesktopApi:
             try:
                 proc = subprocess.Popen(
                     cmd,
+                    cwd=ROOT_DIR,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
