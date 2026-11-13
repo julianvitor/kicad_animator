@@ -13,6 +13,7 @@ import subprocess
 from core.config import (
     HAS_BPY, KICAD_CLI, FFMPEG, RES_MAP, STYLE_DESCRIPTIONS
 )
+from core.progress import RenderProgressBar
 
 if HAS_BPY:
     import bpy
@@ -493,6 +494,8 @@ class BlenderPCBAnimator:
         print(f"📺 Resolução     : {self.width}×{self.height}", flush=True)
         print("="*60 + "\n", flush=True)
 
+        pbar = RenderProgressBar(1, prefix="Blender Preview")
+        pbar.update(0, status="Configurando cena e shaders no Blender...")
         print("📦 Configurando cena e shaders no Blender...", flush=True)
         self._setup_scene()
         self._animate_camera()
@@ -502,8 +505,11 @@ class BlenderPCBAnimator:
         self.scene.render.filepath = os.path.abspath(out_file)
         self.scene.frame_set(frame_idx)
 
+        pbar.update(0, status=f"Renderizando quadro #{frame_idx}...")
         print(f"⏳ Renderizando frame #{frame_idx}...", flush=True)
         bpy.ops.render.render(write_still=True)
+        pbar.update(1, status="Finalizado")
+        pbar.close("Preview gerado")
         print(f"\n✅ Quadro salvo com sucesso em: {out_file}\n", flush=True)
         return out_file
 
@@ -539,15 +545,15 @@ class BlenderPCBAnimator:
             self.scene.frame_start = 1
             self.scene.frame_end = total_frames
 
-            print("\n⏳ Renderizando quadros...", flush=True)
+            print("\n⏳ Renderizando quadros da animação...", flush=True)
+            pbar = RenderProgressBar(total_frames, prefix="Blender Render")
             for f in range(1, total_frames + 1):
                 self.scene.frame_set(f)
                 frame_png = f"{temp_dir}/frame_{f:04d}.png"
                 self.scene.render.filepath = frame_png
                 bpy.ops.render.render(write_still=True)
-                if f % max(1, total_frames // 10) == 0 or f == total_frames:
-                    pct = f / total_frames * 100.0
-                    print(f"  Frame [{f:03d}/{total_frames:03d}] {pct:5.1f}% concluído", flush=True)
+                pbar.update(current=f)
+            pbar.close("Todos os quadros renderizados")
 
             print("\n🎬 Codificando vídeo MP4 final com FFmpeg...", flush=True)
             self._encode_video(temp_dir, total_frames, output_mp4)

@@ -117,6 +117,24 @@ class DesktopApi:
             return True
         return False
 
+    def _parse_and_emit_progress(self, line):
+        m = re.search(r"\[(\d+)/(\d+)\]\s+([\d\.]+)%", line)
+        if m:
+            cur, tot, pct = int(m.group(1)), int(m.group(2)), float(m.group(3))
+            eta_m = re.search(r"ETA\s+([\d:]+)", line)
+            fps_m = re.search(r"([\d\.]+)\s+fps", line)
+            eta = eta_m.group(1) if eta_m else ""
+            fps_val = fps_m.group(1) if fps_m else ""
+
+            status_msg = f"Frame {cur}/{tot} ({pct:.1f}%)"
+            if fps_val:
+                status_msg += f" • {fps_val} fps"
+            self._emit_js(f"window.onProgress({pct}, {json.dumps(status_msg)}, {json.dumps(eta)})")
+        elif "Codificando vídeo MP4" in line:
+            self._emit_js("window.onProgress(97, 'Codificando vídeo MP4 com FFmpeg...', '')")
+        elif "Gerando GIF" in line:
+            self._emit_js("window.onProgress(99, 'Gerando arquivo GIF de preview...', '')")
+
     def render_still_frame(self, params):
         if self.active_proc:
             return {"status": "error", "message": "Já existe um processo em execução."}
@@ -162,6 +180,7 @@ class DesktopApi:
                     if not line: break
                     clean = line.strip()
                     self._emit_log(clean)
+                    self._parse_and_emit_progress(clean)
 
                 proc.wait()
                 rc = proc.returncode
@@ -237,11 +256,7 @@ class DesktopApi:
                     if not line: break
                     clean = line.strip()
                     self._emit_log(clean)
-
-                    m = re.search(r"\[(\d+)/(\d+)\]\s+([\d\.]+)%", clean)
-                    if m:
-                        cur, tot, pct = int(m.group(1)), int(m.group(2)), float(m.group(3))
-                        self._emit_js(f"window.onProgress({pct}, 'Renderizando frame {cur}/{tot} ({pct:.1f}%)')")
+                    self._parse_and_emit_progress(clean)
 
                 proc.wait()
                 rc = proc.returncode

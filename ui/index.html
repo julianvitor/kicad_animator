@@ -374,13 +374,16 @@
         </div>
 
         <!-- Progress Bar and Status -->
-        <div class="flex flex-col gap-1.5">
-          <div class="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
-            <div id="progress-bar-fill" class="h-full w-0 bg-gradient-to-r from-indigo-500 via-teal-400 to-emerald-500 rounded-full transition-all duration-300 progress-striped"></div>
-          </div>
+        <div class="flex flex-col gap-2">
           <div class="flex items-center justify-between text-xs text-slate-400 font-medium">
-            <span id="status-text" class="truncate">Pronto para renderizar</span>
-            <span id="progress-percent" class="font-bold text-slate-200">0%</span>
+            <span id="status-text" class="truncate font-medium text-slate-300">Pronto para renderizar</span>
+            <div class="flex items-center gap-2.5 flex-shrink-0">
+              <span id="status-eta" class="hidden text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">ETA: --:--</span>
+              <span id="progress-percent" class="font-bold text-slate-100 font-mono text-xs md:text-sm">0%</span>
+            </div>
+          </div>
+          <div class="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800 shadow-inner p-0.5">
+            <div id="progress-bar-fill" class="h-full w-0 bg-gradient-to-r from-indigo-500 via-teal-400 to-emerald-400 rounded-full transition-all duration-200 progress-striped shadow-sm"></div>
           </div>
         </div>
       </section>
@@ -577,18 +580,31 @@
     function setRunningState(isRunning) {
       document.getElementById('btn-render-all').disabled = isRunning;
       document.getElementById('btn-cancel').disabled = !isRunning;
+      const etaEl = document.getElementById('status-eta');
       if (isRunning) {
         document.getElementById('progress-bar-fill').style.width = '0%';
         document.getElementById('progress-percent').innerText = '0%';
-        document.getElementById('status-text').innerText = 'Executando renderização...';
+        document.getElementById('status-text').innerText = 'Iniciando pipeline de renderização...';
+        if (etaEl) etaEl.classList.add('hidden');
+      } else {
+        if (etaEl) etaEl.classList.add('hidden');
       }
     }
 
     // Callbacks recebidos da API Python
-    window.onProgress = function(pct, statusText) {
+    window.onProgress = function(pct, statusText, eta) {
       document.getElementById('progress-bar-fill').style.width = pct + '%';
       document.getElementById('progress-percent').innerText = Math.round(pct) + '%';
       if (statusText) document.getElementById('status-text').innerText = statusText;
+      const etaEl = document.getElementById('status-eta');
+      if (etaEl) {
+        if (eta && eta.trim() !== '') {
+          etaEl.innerText = 'ETA: ' + eta;
+          etaEl.classList.remove('hidden');
+        } else if (pct >= 100) {
+          etaEl.classList.add('hidden');
+        }
+      }
     };
 
     window.onLog = function(line) {

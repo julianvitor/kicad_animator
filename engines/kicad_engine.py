@@ -14,6 +14,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from core.config import (
     KICAD_CLI, FFMPEG, RES_MAP, STYLE_DESCRIPTIONS, categorize_ref
 )
+from core.progress import RenderProgressBar
 
 class KiCadNativePCBAnimator:
     def __init__(self, pcb_path, style="rain", mode="both", fps=60, resolution="1080p", workers=None, quality="basic"):
@@ -287,14 +288,14 @@ class KiCadNativePCBAnimator:
 
     def _render_all_frames(self, temp_dir, total_frames):
         completed = 0
+        pbar = RenderProgressBar(total_frames, prefix="KiCad Nativo Render")
         with ProcessPoolExecutor(max_workers=self.workers) as executor:
             futures = {executor.submit(self._render_frame_worker, temp_dir, i): i for i in range(total_frames)}
             for f in as_completed(futures):
                 f.result()
                 completed += 1
-                if completed % (max(1, total_frames // 10)) == 0 or completed == total_frames:
-                    pct = completed / total_frames * 100.0
-                    print(f"⏳ Progresso: [{completed:03d}/{total_frames:03d}] {pct:5.1f}% renderizado", flush=True)
+                pbar.update(current=completed)
+        pbar.close("Renderização de quadros finalizada")
 
     def _encode_video(self, temp_dir, total_frames, output_mp4):
         duration = total_frames / float(self.fps)
@@ -361,17 +362,21 @@ class KiCadNativePCBAnimator:
 
     def render_single_frame(self, frame_idx, output_png):
         temp_dir = tempfile.mkdtemp(prefix="kicad_still_")
+        pbar = RenderProgressBar(1, prefix="KiCad Preview")
         try:
             self._calculate_timeline()
             if frame_idx is None or frame_idx < 0:
                 frame_idx = self.total_frames - int(0.5 * self.fps)
             frame_idx = max(0, min(frame_idx, self.total_frames - 1))
+            pbar.update(0, status=f"Renderizando quadro {frame_idx} com KiCad Nativo...")
             print(f"📸 Renderizando quadro {frame_idx} com KiCad Nativo ({self.width}x{self.height})...", flush=True)
             self._render_frame_worker(temp_dir, frame_idx)
             src = os.path.join(temp_dir, f"frame_{frame_idx:04d}.png")
             if os.path.exists(src):
                 os.makedirs(os.path.dirname(os.path.abspath(output_png)), exist_ok=True)
                 shutil.copy2(src, output_png)
+                pbar.update(1, status="Finalizado")
+                pbar.close("Preview salvo")
                 print(f"✅ Preview salvo em: {output_png}", flush=True)
                 return output_png
             else:
