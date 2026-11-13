@@ -16,20 +16,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Set up Python 3.13
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.13"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller pywebview numpy
+          pip install pyinstaller pywebview numpy bpy
 
       - name: Build Standalone Windows Executable
         run: |
-          pyinstaller --noconfirm --onefile --windowed --name "KiCad-Animator" --add-data "ui;ui" main.py
-          Compress-Archive -Path dist\KiCad-Animator.exe -DestinationPath dist\KiCad-Animator-Windows-x64.zip
+          pyinstaller --noconfirm --onedir --windowed --name "KiCad-Animator" `
+            --add-data "ui;ui" `
+            --collect-all bpy `
+            --collect-all numpy `
+            --hidden-import "logging.handlers" `
+            --hidden-import "tomllib" `
+            --hidden-import "xml.dom.minidom" `
+            --hidden-import "xml.etree.ElementTree" `
+            --hidden-import "colorsys" `
+            main.py
+          Compress-Archive -Path dist\KiCad-Animator -DestinationPath dist\KiCad-Animator-Windows-x64.zip
 
       - name: Upload Windows Asset
         uses: actions/upload-artifact@v4
@@ -44,19 +53,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Set up Python 3.13
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.13"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller pywebview numpy pyobjc-framework-WebKit pyobjc-framework-Cocoa
+          pip install pyinstaller pywebview numpy bpy pyobjc-framework-WebKit pyobjc-framework-Cocoa
 
       - name: Build Standalone macOS App
         run: |
-          pyinstaller --noconfirm --onedir --windowed --name "KiCad-Animator" --add-data "ui:ui" main.py
+          pyinstaller --noconfirm --onedir --windowed --name "KiCad-Animator" \
+            --add-data "ui:ui" \
+            --collect-all bpy \
+            --collect-all numpy \
+            --hidden-import "logging.handlers" \
+            --hidden-import "tomllib" \
+            --hidden-import "xml.dom.minidom" \
+            --hidden-import "xml.etree.ElementTree" \
+            --hidden-import "colorsys" \
+            main.py
           cd dist
           zip -r KiCad-Animator-macOS.zip KiCad-Animator.app
 
