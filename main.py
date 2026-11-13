@@ -81,15 +81,27 @@ def main():
 
     # 2. Verificação de Runtime para o Blender (se backend == "blender"):
     if args.backend == "blender" and not HAS_BPY:
+        # Se for executável standalone empacotado (.app ou .exe), não tenta invocar ferramentas de dev
+        if getattr(sys, "frozen", False):
+            if BLENDER_BIN:
+                cmd = [BLENDER_BIN, "--background", "--python", os.path.abspath(__file__), "--"] + raw_args
+                sys.exit(subprocess.call(cmd, cwd=script_dir))
+            else:
+                print("\n❌ Erro: O motor Blender não foi encontrado no sistema.", file=sys.stderr)
+                print("💡 O executável standalone requer o aplicativo Blender instalado (ex: /Applications/Blender.app ou no PATH).", file=sys.stderr)
+                print("💡 Alternativa: Selecione o motor 'KiCad Nativo (CPU)' no painel esquerdo, ou execute via './run_unix.sh' que roda com o motor bpy integrado.\n", file=sys.stderr)
+                sys.exit(1)
+
+        # Modo desenvolvimento / código-fonte:
         if target_py and os.path.exists(target_py) and os.path.abspath(sys.executable) != os.path.abspath(target_py):
             cmd = [target_py, os.path.abspath(__file__)] + raw_args
             sys.exit(subprocess.call(cmd, cwd=script_dir))
 
-        if POETRY_BIN and "POETRY_ACTIVE" not in os.environ:
+        if POETRY_BIN and "POETRY_ACTIVE" not in os.environ and os.path.exists(os.path.join(script_dir, "pyproject.toml")):
             cmd = [POETRY_BIN, "--directory", script_dir, "run", "python", os.path.abspath(__file__)] + raw_args
             sys.exit(subprocess.call(cmd, cwd=script_dir))
 
-        if UV_BIN:
+        if UV_BIN and os.path.exists(os.path.join(script_dir, "pyproject.toml")):
             cmd = [UV_BIN, "run", "--directory", script_dir, "--python", "3.13", "--with", "bpy", "python", os.path.abspath(__file__)] + raw_args
             sys.exit(subprocess.call(cmd, cwd=script_dir))
 

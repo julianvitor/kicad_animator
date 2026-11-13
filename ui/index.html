@@ -451,10 +451,33 @@
         if (initData.last_preview_b64) {
           showPreviewImage(initData.last_preview_b64, initData.last_preview_path);
         }
+        if (initData.has_kicad !== undefined) {
+          window.hasBlender = initData.has_blender;
+          updateBadge('badge-kicad', initData.has_kicad, 'KiCad');
+          updateBadge('badge-blender', initData.has_blender, 'Blender');
+          updateBadge('badge-ffmpeg', initData.has_ffmpeg, 'FFmpeg');
+
+          if (!initData.has_blender && initData.has_kicad) {
+            selectBackend('kicad');
+            appendLog('Blender não detectado no sistema. Selecionado motor KiCad Nativo (CPU).', 'info');
+          }
+        }
       } catch (err) {
         appendLog('Erro ao carregar dados iniciais: ' + err, 'error');
       }
     });
+
+    function updateBadge(id, isOk, label) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (isOk) {
+        el.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> ${label}`;
+      } else {
+        el.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20';
+        el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> ${label} (?)`;
+      }
+    }
 
     function selectBackend(backend) {
       currentBackend = backend;

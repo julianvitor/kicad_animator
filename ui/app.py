@@ -17,7 +17,7 @@ try:
 except ImportError:
     webview = None
 
-from core.config import get_best_python
+from core.config import get_best_python, KICAD_CLI, FFMPEG, BLENDER_BIN, HAS_BPY
 from core.parser import find_available_pcbs, inspect_pcb_meta
 
 if getattr(sys, "frozen", False):
@@ -72,7 +72,11 @@ class DesktopApi:
             "pcbs": pcbs,
             "default_output": default_out,
             "last_preview_b64": last_preview_b64,
-            "last_preview_path": last_preview_path
+            "last_preview_path": last_preview_path,
+            "has_kicad": bool(KICAD_CLI),
+            "has_blender": bool(HAS_BPY or BLENDER_BIN),
+            "has_ffmpeg": bool(FFMPEG),
+            "is_frozen": getattr(sys, "frozen", False)
         }
 
     def inspect_pcb(self, pcb_path):
