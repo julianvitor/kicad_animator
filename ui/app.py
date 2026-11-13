@@ -138,11 +138,11 @@ class DesktopApi:
                 status_msg += f" • {fps_val} fps"
             self._emit_js(f"window.onProgress({scaled_pct:.1f}, {json.dumps(status_msg)}, {json.dumps(eta)})")
         elif "Codificando vídeo MP4" in line:
-            self._emit_js("window.onProgress(96, 'Codificando vídeo MP4 com FFmpeg...', '')")
+            self._emit_js("window.onProgress(96, 'Codificando MP4...', '')")
         elif "Gerando GIF" in line:
-            self._emit_js("window.onProgress(98, 'Gerando arquivo GIF de preview...', '')")
+            self._emit_js("window.onProgress(98, 'Gerando GIF...', '')")
         elif "CONCLUÍDO COM SUCESSO" in line or "CONCLUÍDA COM SUCESSO" in line or "Quadro salvo com sucesso" in line:
-            self._emit_js("window.onProgress(100, 'Renderização 100% concluída!', '')")
+            self._emit_js("window.onProgress(100, 'Renderização concluída', '')")
 
     def render_still_frame(self, params):
         if self.active_proc:
@@ -271,9 +271,9 @@ class DesktopApi:
                 rc = proc.returncode
 
                 if rc == 0:
-                    self._emit_js("window.onRenderComplete(true, 'Renderização finalizada com sucesso!')")
+                    self._emit_js("window.onRenderComplete(true, 'Renderização concluída.')")
                 else:
-                    self._emit_js(f"window.onRenderComplete(false, 'Renderização finalizada com código de erro {rc}.')")
+                    self._emit_js(f"window.onRenderComplete(false, 'Renderização com erro (código {rc}).')")
             except Exception as e:
                 self._emit_log(f"❌ Erro na renderização: {e}")
                 self._emit_js(f"window.onRenderComplete(false, {json.dumps(str(e))})")
@@ -290,11 +290,11 @@ class DesktopApi:
                 time.sleep(0.4)
                 if self.active_proc and self.active_proc.poll() is None:
                     self.active_proc.kill()
-                self._emit_log("🛑 Processo cancelado com sucesso.")
+                self._emit_log("🛑 Processo cancelado.")
             except Exception as e:
                 self._emit_log(f"Erro ao cancelar: {e}")
             self.active_proc = None
-            self._emit_js("window.onRenderComplete(false, 'Processo cancelado pelo usuário.')")
+            self._emit_js("window.onRenderComplete(false, 'Cancelado pelo usuário.')")
             return {"status": "cancelled"}
         return {"status": "idle"}
 
@@ -317,7 +317,7 @@ def launch_ui():
 
     api = DesktopApi()
     window = webview.create_window(
-        title="KiCad 3D PCB Assembly Animator",
+        title="KiCad Animator",
         url=UI_HTML_PATH,
         js_api=api,
         width=1180,
