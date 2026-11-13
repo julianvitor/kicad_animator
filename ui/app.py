@@ -126,14 +126,23 @@ class DesktopApi:
             eta = eta_m.group(1) if eta_m else ""
             fps_val = fps_m.group(1) if fps_m else ""
 
+            # Para animações com múltiplos quadros, reserva 0-95% para os quadros 3D
+            # e 95-100% para o muxing do vídeo FFmpeg / GIF
+            if tot > 1:
+                scaled_pct = min(95.0, (cur / float(tot)) * 95.0)
+            else:
+                scaled_pct = (cur / float(tot)) * 100.0
+
             status_msg = f"Frame {cur}/{tot} ({pct:.1f}%)"
             if fps_val:
                 status_msg += f" • {fps_val} fps"
-            self._emit_js(f"window.onProgress({pct}, {json.dumps(status_msg)}, {json.dumps(eta)})")
+            self._emit_js(f"window.onProgress({scaled_pct:.1f}, {json.dumps(status_msg)}, {json.dumps(eta)})")
         elif "Codificando vídeo MP4" in line:
-            self._emit_js("window.onProgress(97, 'Codificando vídeo MP4 com FFmpeg...', '')")
+            self._emit_js("window.onProgress(96, 'Codificando vídeo MP4 com FFmpeg...', '')")
         elif "Gerando GIF" in line:
-            self._emit_js("window.onProgress(99, 'Gerando arquivo GIF de preview...', '')")
+            self._emit_js("window.onProgress(98, 'Gerando arquivo GIF de preview...', '')")
+        elif "CONCLUÍDO COM SUCESSO" in line or "CONCLUÍDA COM SUCESSO" in line or "Quadro salvo com sucesso" in line:
+            self._emit_js("window.onProgress(100, 'Renderização 100% concluída!', '')")
 
     def render_still_frame(self, params):
         if self.active_proc:

@@ -621,13 +621,31 @@
     window.onPreviewComplete = function(b64, filePath) {
       showPreviewImage(b64, filePath);
       setRunningState(false);
+      document.getElementById('progress-bar-fill').style.width = '100%';
+      document.getElementById('progress-percent').innerText = '100%';
+      const etaEl = document.getElementById('status-eta');
+      if (etaEl) etaEl.classList.add('hidden');
       document.getElementById('status-text').innerText = 'Preview de 1 frame renderizado com sucesso!';
     };
 
     window.onRenderComplete = function(success, message) {
       setRunningState(false);
-      document.getElementById('progress-bar-fill').style.width = success ? '100%' : '0%';
-      document.getElementById('status-text').innerText = success ? '🎉 Renderização concluída!' : 'Processo interrompido/erro';
+      const fill = document.getElementById('progress-bar-fill');
+      const pctText = document.getElementById('progress-percent');
+      const statusText = document.getElementById('status-text');
+      const etaEl = document.getElementById('status-eta');
+
+      if (etaEl) etaEl.classList.add('hidden');
+
+      if (success) {
+        fill.style.width = '100%';
+        pctText.innerText = '100%';
+        statusText.innerText = '🎉 Renderização concluída com sucesso!';
+      } else {
+        fill.style.width = '0%';
+        pctText.innerText = '0%';
+        statusText.innerText = 'Processo interrompido/erro';
+      }
       appendLog(message, success ? 'success' : 'error');
     };
 
