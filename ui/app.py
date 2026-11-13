@@ -1,0 +1,305 @@
+"""
+KiCad Animator - Desktop Web App Runner (pywebview)
+"""
+
+import os
+import sys
+import re
+import time
+import json
+import base64
+import threading
+import subprocess
+
+try:
+    import webview
+except ImportError:
+    webview = None
+
+from core.config import get_best_python
+from core.parser import find_available_pcbs, inspect_pcb_meta
+
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+MAIN_SCRIPT = os.path.join(ROOT_DIR, "main.py")
+UI_HTML_PATH = os.path.join(os.path.dirname(__file__), "index.html")
+PYTHON_BIN = get_best_python()
+
+class DesktopApi:
+    def __init__(self):
+        self.window = None
+        self.active_proc = None
+
+    def set_window(self, window):
+        self.window = window
+
+    def get_initial_data(self):
+        pcbs = find_available_pcbs(ROOT_DIR)
+        default_pcb = pcbs[0] if pcbs else ""
+        default_out = ""
+        if default_pcb:
+            base_dir = os.path.dirname(os.path.abspath(default_pcb))
+            exports_dir = os.path.join(base_dir, "exports", "animacoes")
+            default_out = exports_dir if os.path.exists(exports_dir) else base_dir
+
+        last_preview_b64 = None
+        last_preview_path = None
+        candidates = [
+            "/tmp/preview_gui_blender.png",
+            "/tmp/preview_gui_kicad.png",
+            "/tmp/test_blender_still.png",
+            "/tmp/test_kicad_still.png",
+            "/tmp/preview_iluminacao.png"
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                try:
+                    with open(c, "rb") as f:
+                        last_preview_b64 = base64.b64encode(f.read()).decode("utf-8")
+                        last_preview_path = c
+                        break
+                except Exception:
+                    pass
+
+        return {
+            "pcbs": pcbs,
+            "default_output": default_out,
+            "last_preview_b64": last_preview_b64,
+            "last_preview_path": last_preview_path
+        }
+
+    def inspect_pcb(self, pcb_path):
+        return inspect_pcb_meta(pcb_path)
+
+    def browse_pcb_file(self):
+        try:
+            if self.window:
+                res = self.window.create_file_dialog(
+                    webview.FileDialog.OPEN,
+                    file_types=("KiCad PCB (*.kicad_pcb)", "All files (*.*)")
+                )
+                if res and len(res) > 0:
+                    return res[0]
+        except Exception:
+            pass
+
+        # Fallback AppleScript no macOS
+        try:
+            scpt = 'POSIX path of (choose file with prompt "Selecione o arquivo da placa KiCad (.kicad_pcb)" of type {"kicad_pcb", "public.data"})'
+            r = subprocess.run(["osascript", "-e", scpt], capture_output=True, text=True)
+            if r.returncode == 0 and r.stdout.strip():
+                return r.stdout.strip()
+        except Exception:
+            pass
+        return None
+
+    def browse_output_dir(self):
+        try:
+            if self.window:
+                res = self.window.create_file_dialog(webview.FileDialog.FOLDER)
+                if res and len(res) > 0:
+                    return res[0]
+        except Exception:
+            pass
+
+        # Fallback AppleScript no macOS
+        try:
+            scpt = 'POSIX path of (choose folder with prompt "Selecione a pasta para exportação das animações")'
+            r = subprocess.run(["osascript", "-e", scpt], capture_output=True, text=True)
+            if r.returncode == 0 and r.stdout.strip():
+                return r.stdout.strip()
+        except Exception:
+            pass
+        return None
+
+    def open_path(self, path):
+        if path and os.path.exists(path):
+            subprocess.run(["open", path])
+            return True
+        return False
+
+    def render_still_frame(self, params):
+        if self.active_proc:
+            return {"status": "error", "message": "Já existe um processo em execução."}
+
+        pcb = params.get("pcb")
+        backend = params.get("backend", "blender")
+        res = params.get("res", "1080p")
+        preview_out = f"/tmp/preview_gui_{backend}.png"
+
+        cmd = [
+            PYTHON_BIN, MAIN_SCRIPT,
+            "--backend", backend,
+            "--pcb", pcb,
+            "--still-frame", "90",
+            "--res", res,
+            "--output", preview_out
+        ]
+
+        if backend == "blender":
+            cmd += [
+                "--engine", params.get("blender_engine", "eevee"),
+                "--samples", str(params.get("blender_samples", 32)),
+                "--light-intensity", str(params.get("light_intensity", 1.0))
+            ]
+        else:
+            cmd += [
+                "--workers", str(params.get("kicad_workers", 8)),
+                "--kicad-quality", params.get("kicad_quality", "basic")
+            ]
+
+        def runner():
+            try:
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
+                self.active_proc = proc
+
+                for line in iter(proc.stdout.readline, ""):
+                    if not line: break
+                    clean = line.strip()
+                    self._emit_log(clean)
+
+                proc.wait()
+                rc = proc.returncode
+
+                if rc == 0 and os.path.exists(preview_out):
+                    with open(preview_out, "rb") as f:
+                        b64 = base64.b64encode(f.read()).decode("utf-8")
+                    self._emit_js(f"window.onPreviewComplete('{b64}', {json.dumps(preview_out)})")
+                else:
+                    self._emit_log(f"❌ Falha ao gerar preview (Código {rc}).")
+                    self._emit_js(f"window.onRenderComplete(false, 'Falha ao gerar preview (Código {rc}).')")
+            except Exception as e:
+                self._emit_log(f"❌ Erro crítico: {e}")
+                self._emit_js(f"window.onRenderComplete(false, {json.dumps(str(e))})")
+            finally:
+                self.active_proc = None
+
+        threading.Thread(target=runner, daemon=True).start()
+        return {"status": "started"}
+
+    def start_full_render(self, params):
+        if self.active_proc:
+            return {"status": "error", "message": "Já existe um processo em execução."}
+
+        pcb = params.get("pcb")
+        backend = params.get("backend", "blender")
+        style = params.get("style", "rain")
+        mode = params.get("mode", "both")
+        res = params.get("res", "1080p")
+        fps = str(params.get("fps", 60))
+        out_dest = params.get("output", "")
+
+        cmd = [
+            PYTHON_BIN, MAIN_SCRIPT,
+            "--backend", backend,
+            "--pcb", pcb,
+            "--style", style,
+            "--mode", mode,
+            "--res", res,
+            "--fps", fps,
+            "--output", out_dest
+        ]
+
+        if params.get("gif"):
+            cmd.append("--gif")
+
+        if backend == "blender":
+            cmd += [
+                "--engine", params.get("blender_engine", "eevee"),
+                "--samples", str(params.get("blender_samples", 32)),
+                "--light-intensity", str(params.get("light_intensity", 1.0))
+            ]
+            if params.get("save_blend"):
+                cmd.append("--save-blend")
+        else:
+            cmd += [
+                "--workers", str(params.get("kicad_workers", 8)),
+                "--kicad-quality", params.get("kicad_quality", "basic")
+            ]
+
+        def runner():
+            try:
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
+                self.active_proc = proc
+
+                for line in iter(proc.stdout.readline, ""):
+                    if not line: break
+                    clean = line.strip()
+                    self._emit_log(clean)
+
+                    m = re.search(r"\[(\d+)/(\d+)\]\s+([\d\.]+)%", clean)
+                    if m:
+                        cur, tot, pct = int(m.group(1)), int(m.group(2)), float(m.group(3))
+                        self._emit_js(f"window.onProgress({pct}, 'Renderizando frame {cur}/{tot} ({pct:.1f}%)')")
+
+                proc.wait()
+                rc = proc.returncode
+
+                if rc == 0:
+                    self._emit_js("window.onRenderComplete(true, 'Renderização finalizada com sucesso!')")
+                else:
+                    self._emit_js(f"window.onRenderComplete(false, 'Renderização finalizada com código de erro {rc}.')")
+            except Exception as e:
+                self._emit_log(f"❌ Erro na renderização: {e}")
+                self._emit_js(f"window.onRenderComplete(false, {json.dumps(str(e))})")
+            finally:
+                self.active_proc = None
+
+        threading.Thread(target=runner, daemon=True).start()
+        return {"status": "started"}
+
+    def cancel_render(self):
+        if self.active_proc:
+            try:
+                self.active_proc.terminate()
+                time.sleep(0.4)
+                if self.active_proc and self.active_proc.poll() is None:
+                    self.active_proc.kill()
+                self._emit_log("🛑 Processo cancelado com sucesso.")
+            except Exception as e:
+                self._emit_log(f"Erro ao cancelar: {e}")
+            self.active_proc = None
+            self._emit_js("window.onRenderComplete(false, 'Processo cancelado pelo usuário.')")
+            return {"status": "cancelled"}
+        return {"status": "idle"}
+
+    def _emit_log(self, text):
+        if self.window and text:
+            safe = json.dumps(text)
+            self._emit_js(f"window.onLog({safe})")
+
+    def _emit_js(self, code):
+        if self.window:
+            try:
+                self.window.evaluate_js(code)
+            except Exception:
+                pass
+
+def launch_ui():
+    if webview is None:
+        print("❌ Erro: 'pywebview' não está disponível.", file=sys.stderr)
+        sys.exit(1)
+
+    api = DesktopApi()
+    window = webview.create_window(
+        title="KiCad 3D PCB Assembly Animator",
+        url=UI_HTML_PATH,
+        js_api=api,
+        width=1180,
+        height=860,
+        min_size=(960, 700),
+        background_color="#090d16"
+    )
+    api.set_window(window)
+    webview.start(debug=False)

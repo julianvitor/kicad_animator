@@ -1,0 +1,3 @@
+"""
+KiCad Animator - Core Module
+"""
