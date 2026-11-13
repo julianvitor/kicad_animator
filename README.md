@@ -10,9 +10,26 @@ Compatível com **Linux**, **Windows** e **macOS**.
 
 ---
 
-## 🚀 Ponto de Entrada Único
+## 🚀 Inicialização em 1 Clique (Zero Configuração)
 
-Você pode executar toda a aplicação (Interface Gráfica Desktop, Linha de Comando ou Modo Interativo) através de um único comando:
+Para não precisar digitar comandos ou instalar manualmente dependências e Poetry, use o inicializador correspondente ao seu sistema operacional:
+
+### Linux e macOS
+```bash
+./run_unix.sh
+```
+
+### Windows (PowerShell ou Clique Duplo)
+```powershell
+.\run_windows.ps1
+```
+*(ou simplesmente dê um duplo clique no arquivo `run_windows.bat`).*
+
+> Ambos os scripts detectam a versão adequada do Python, instalam o Poetry automaticamente se necessário, instalam todas as dependências do projeto e abrem a aplicação de imediato.
+
+---
+
+## 🛠️ Modos de Execução Manual (Poetry / Python)
 
 ### Usando Poetry (Recomendado)
 ```bash
