@@ -20,10 +20,16 @@ except ImportError:
 from core.config import get_best_python
 from core.parser import find_available_pcbs, inspect_pcb_meta
 
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-MAIN_SCRIPT = os.path.join(ROOT_DIR, "main.py")
-UI_HTML_PATH = os.path.join(os.path.dirname(__file__), "index.html")
-PYTHON_BIN = get_best_python()
+if getattr(sys, "frozen", False):
+    ROOT_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(sys.executable)))
+    UI_HTML_PATH = os.path.join(ROOT_DIR, "ui", "index.html")
+    MAIN_SCRIPT = None
+    PYTHON_BIN = sys.executable
+else:
+    ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    MAIN_SCRIPT = os.path.join(ROOT_DIR, "main.py")
+    UI_HTML_PATH = os.path.join(os.path.dirname(__file__), "index.html")
+    PYTHON_BIN = get_best_python()
 
 class DesktopApi:
     def __init__(self):
@@ -198,8 +204,12 @@ class DesktopApi:
         res = params.get("res", "1080p")
         preview_out = os.path.join(tempfile.gettempdir(), f"preview_gui_{backend}.png")
 
-        cmd = [
-            PYTHON_BIN, MAIN_SCRIPT,
+        if getattr(sys, "frozen", False):
+            cmd = [sys.executable]
+        else:
+            cmd = [PYTHON_BIN, MAIN_SCRIPT]
+
+        cmd += [
             "--backend", backend,
             "--pcb", pcb,
             "--still-frame", "90",
@@ -267,8 +277,12 @@ class DesktopApi:
         fps = str(params.get("fps", 60))
         out_dest = params.get("output", "")
 
-        cmd = [
-            PYTHON_BIN, MAIN_SCRIPT,
+        if getattr(sys, "frozen", False):
+            cmd = [sys.executable]
+        else:
+            cmd = [PYTHON_BIN, MAIN_SCRIPT]
+
+        cmd += [
             "--backend", backend,
             "--pcb", pcb,
             "--style", style,
