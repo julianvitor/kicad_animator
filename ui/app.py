@@ -21,8 +21,9 @@ from core.config import get_best_python, KICAD_CLI, FFMPEG, BLENDER_BIN, HAS_BPY
 from core.parser import find_available_pcbs, inspect_pcb_meta
 
 if getattr(sys, "frozen", False):
-    ROOT_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(sys.executable)))
-    UI_HTML_PATH = os.path.join(ROOT_DIR, "ui", "index.html")
+    BUNDLE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(sys.executable)))
+    ROOT_DIR = os.path.dirname(os.path.abspath(sys.executable))
+    UI_HTML_PATH = os.path.join(BUNDLE_DIR, "ui", "index.html")
     MAIN_SCRIPT = None
     PYTHON_BIN = sys.executable
 else:
@@ -30,6 +31,8 @@ else:
     MAIN_SCRIPT = os.path.join(ROOT_DIR, "main.py")
     UI_HTML_PATH = os.path.join(os.path.dirname(__file__), "index.html")
     PYTHON_BIN = get_best_python()
+
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if sys.platform == "win32" else 0
 
 class DesktopApi:
     def __init__(self):
@@ -313,7 +316,8 @@ class DesktopApi:
                     encoding="utf-8",
                     errors="replace",
                     bufsize=1,
-                    env=env
+                    env=env,
+                    creationflags=NO_WINDOW
                 )
                 self.active_proc = proc
 
@@ -400,7 +404,8 @@ class DesktopApi:
                     encoding="utf-8",
                     errors="replace",
                     bufsize=1,
-                    env=env
+                    env=env,
+                    creationflags=NO_WINDOW
                 )
                 self.active_proc = proc
 

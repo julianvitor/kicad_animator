@@ -24,7 +24,7 @@ class PCBMetaParser:
                     pts_x.append(float(match.group(1)))
                     pts_y.append(float(match.group(2)))
 
-        fp_pattern = re.compile(r"\t\(footprint\s+\"([^\"]+)\"[\s\S]*?\n\t\)")
+        fp_pattern = re.compile(r"(?:\t|  )\(footprint\s+\"([^\"]+)\"[\s\S]*?\n(?:\t|  )\)")
         self.footprints = []
         for m in fp_pattern.finditer(self.txt):
             blk = m.group(0)
@@ -67,14 +67,30 @@ class PCBMetaParser:
         self.bot_models = [fp for fp in self.footprints if fp["layer"] == "B.Cu" and fp["has_model"]]
 
 def find_available_pcbs(root_dir=None):
-    base = root_dir or os.getcwd()
-    found = glob.glob(os.path.join(base, "**/*.kicad_pcb"), recursive=True) + glob.glob(os.path.join(base, "*.kicad_pcb"))
-    parent_dir = os.path.dirname(os.path.abspath(base))
+    base = os.path.abspath(root_dir or os.getcwd())
+    skip_dirs = {"_internal", ".venv", "venv", "build", "dist", ".git", "node_modules", "__pycache__"}
+    found = []
+
+    search_roots = [base]
+    parent_dir = os.path.dirname(base)
     jardim_pcb = os.path.join(parent_dir, "jardim", "hardware", "jardim.kicad_pcb")
     if os.path.exists(jardim_pcb):
         found.append(jardim_pcb)
 
-    clean = [os.path.abspath(p) for p in set(found) if not p.endswith(".bak") and ".history" not in p]
+    kicad_docs = os.path.expanduser("~/Documents/KiCad")
+    if os.path.isdir(kicad_docs):
+        search_roots.append(kicad_docs)
+
+    for sroot in search_roots:
+        if not os.path.isdir(sroot):
+            continue
+        for dirpath, dirnames, filenames in os.walk(sroot):
+            dirnames[:] = [d for d in dirnames if d not in skip_dirs and not d.startswith(".")]
+            for fn in filenames:
+                if fn.endswith(".kicad_pcb") and not fn.endswith(".bak") and not fn.startswith("."):
+                    found.append(os.path.join(dirpath, fn))
+
+    clean = [os.path.abspath(p) for p in set(found) if ".history" not in p]
     return sorted(clean)
 
 def inspect_pcb_meta(pcb_path):
@@ -82,12 +98,16 @@ def inspect_pcb_meta(pcb_path):
         return None
     try:
         p = PCBMetaParser(pcb_path)
+        base_dir = os.path.dirname(os.path.abspath(pcb_path))
+        exports_dir = os.path.join(base_dir, "exports", "animacoes")
+        default_out = exports_dir if os.path.exists(exports_dir) else base_dir
         return {
             "width": p.width,
             "height": p.height,
             "top": len(p.top_models),
             "bottom": len(p.bot_models),
-            "total_models": len(p.top_models) + len(p.bot_models)
+            "total_models": len(p.top_models) + len(p.bot_models),
+            "default_output": default_out
         }
     except Exception:
         return None

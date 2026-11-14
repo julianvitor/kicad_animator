@@ -27,7 +27,7 @@ class RenderProgressBar:
         self.current = 0
         self.start_time = time.time()
         self.last_print_time = 0.0
-        self.is_tty = sys.stdout.isatty()
+        self.is_tty = bool(sys.stdout and hasattr(sys.stdout, "isatty") and sys.stdout.isatty())
 
     def update(self, current=None, step=1, status=None):
         if current is not None:
@@ -50,6 +50,9 @@ class RenderProgressBar:
         bar = "█" * filled_len + "░" * (self.bar_width - filled_len)
 
         status_suffix = f" • {status}" if status else ""
+
+        if not sys.stdout:
+            return
 
         if self.is_tty:
             line = (
@@ -79,6 +82,9 @@ class RenderProgressBar:
             self.update(current=self.total)
         elapsed = time.time() - self.start_time
         avg_fps = self.total / elapsed if elapsed > 0 else 0.0
+        if not sys.stdout:
+            return
+
         if self.is_tty:
             print(f"✨ {self.prefix}: {message} em {format_time(elapsed)} ({avg_fps:.1f} fps médio)\n", flush=True)
         else:

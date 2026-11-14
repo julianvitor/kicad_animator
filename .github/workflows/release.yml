@@ -83,6 +83,7 @@ jobs:
             --add-data "ui:ui" \
             --collect-all bpy \
             --collect-all numpy \
+            --collect-all pywebview \
             --hidden-import "logging.handlers" \
             --hidden-import "tomllib" \
             --hidden-import "xml.dom.minidom" \

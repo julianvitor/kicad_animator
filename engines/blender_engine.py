@@ -19,6 +19,8 @@ if HAS_BPY:
     import bpy
     from mathutils import Vector
 
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if sys.platform == "win32" else 0
+
 def export_kicad_glb(pcb_path, output_glb):
     """Exporta a placa KiCad para um arquivo 3D GLB unificado com camadas completas."""
     print(f"📐 Exportando modelo 3D GLB via kicad-cli: {os.path.basename(pcb_path)}...", flush=True)
@@ -33,7 +35,7 @@ def export_kicad_glb(pcb_path, output_glb):
         "-o", output_glb,
         pcb_path
     ]
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
     if res.returncode != 0:
         print(f"❌ Erro ao exportar GLB do KiCad:\n{res.stderr}", file=sys.stderr, flush=True)
         sys.exit(1)
@@ -646,7 +648,7 @@ class BlenderPCBAnimator:
             "-pix_fmt", "yuv420p",
             output_mp4
         ]
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, creationflags=NO_WINDOW)
 
     def _encode_gif(self, input_mp4, output_gif):
         os.makedirs(os.path.dirname(os.path.abspath(output_gif)), exist_ok=True)
@@ -656,4 +658,4 @@ class BlenderPCBAnimator:
             "-vf", "fps=30,scale=1000:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3",
             output_gif
         ]
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, creationflags=NO_WINDOW)

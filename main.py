@@ -19,6 +19,12 @@ import argparse
 import tempfile
 import subprocess
 
+# Garante streams válidos (em modo PyInstaller --windowed, stdout/stderr podem ser None)
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
 # Garante suporte a UTF-8 no console do Windows para evitar erros com emojis e caracteres especiais
 if sys.platform == "win32":
     for stream in (sys.stdout, sys.stderr):
@@ -37,7 +43,7 @@ venv_candidates = [
 ]
 target_py = next((p for p in venv_candidates if os.path.exists(p)), None)
 
-if target_py and os.path.abspath(sys.executable) != os.path.abspath(target_py):
+if not getattr(sys, "frozen", False) and target_py and os.path.abspath(sys.executable) != os.path.abspath(target_py):
     try:
         import bpy
         import webview

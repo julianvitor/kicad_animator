@@ -1,4 +1,4 @@
-# ==============================================================================
+﻿# ==============================================================================
 # KiCad Animator - Empacotador Standalone para Windows (.exe) com Blender (bpy)
 # ==============================================================================
 $ErrorActionPreference = "Stop"
@@ -13,18 +13,18 @@ foreach ($p in @($UserScripts, $UserLocalBin, $PoetryBin)) {
     if (Test-Path $p) { $env:Path = "$p;$env:Path" }
 }
 
-Write-Host "⚡ [KiCad Animator] Empacotando aplicativo standalone para Windows..." -ForegroundColor Cyan
+Write-Host "[KiCad Animator] Empacotando aplicativo standalone para Windows..." -ForegroundColor Cyan
 
 $Pyi = Join-Path $ScriptDir ".venv\Scripts\pyinstaller.exe"
 $Py = Join-Path $ScriptDir ".venv\Scripts\python.exe"
 if (-not (Test-Path $Pyi)) {
-    Write-Host "📦 Instalando PyInstaller no ambiente local..." -ForegroundColor Yellow
+    Write-Host "[*] Instalando PyInstaller no ambiente local..." -ForegroundColor Yellow
     & poetry run pip install pyinstaller
 }
 try {
     & $Py -c "import bpy" 2>$null
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "📦 Instalando bpy no ambiente local para empacotamento..." -ForegroundColor Yellow
+        Write-Host "[*] Instalando bpy no ambiente local para empacotamento..." -ForegroundColor Yellow
         & $Py -m pip install bpy
     }
 } catch {
@@ -66,6 +66,6 @@ $ZipOut = Join-Path $ScriptDir "dist\KiCad-Animator-Windows-x64.zip"
 
 Compress-Archive -Path "$DistDir\*" -DestinationPath $ZipOut -Force
 
-Write-Host "✅ Empacotamento concluído com sucesso!" -ForegroundColor Green
-Write-Host "📦 Pasta gerada: dist\KiCad-Animator\KiCad-Animator.exe" -ForegroundColor Green
-Write-Host "🗜️ Arquivo ZIP: dist\KiCad-Animator-Windows-x64.zip" -ForegroundColor Green
+Write-Host "[OK] Empacotamento concluido com sucesso!" -ForegroundColor Green
+Write-Host "[OK] Pasta gerada: dist\KiCad-Animator\KiCad-Animator.exe" -ForegroundColor Green
+Write-Host "[OK] Arquivo ZIP: dist\KiCad-Animator-Windows-x64.zip" -ForegroundColor Green

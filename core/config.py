@@ -74,6 +74,7 @@ FFMPEG_PATHS = [
     r"C:\ffmpeg\bin\ffmpeg.exe",
     os.path.join(prog_files, "ffmpeg", "bin", "ffmpeg.exe"),
     os.path.join(prog_files, "ffmpeg", "ffmpeg.exe"),
+    os.path.join(local_app_data, "Microsoft", "WinGet", "Packages", "*", "*", "bin", "ffmpeg.exe") if local_app_data else None,
     os.path.join(local_app_data, "Microsoft", "WinGet", "Packages", "*", "*ffmpeg.exe") if local_app_data else None,
 ]
 FFMPEG = find_binary("ffmpeg", FFMPEG_PATHS)

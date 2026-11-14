@@ -340,7 +340,7 @@
             Pré-visualização
           </h2>
           <div class="flex items-center gap-2">
-            <button onclick="renderStillPreview()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1.5">
+            <button id="btn-preview" onclick="renderStillPreview()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1.5">
               <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
               Gerar Preview
             </button>
@@ -440,7 +440,7 @@
           initData.pcbs.forEach(p => {
             const opt = document.createElement('option');
             opt.value = p;
-            opt.innerText = p.split('/').pop() + ' (' + p + ')';
+            opt.innerText = p.split(/[\\/]/).pop() + ' (' + p + ')';
             select.appendChild(opt);
           });
           onPcbSelected();
@@ -512,6 +512,9 @@
             <svg class="w-4 h-4 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <span><strong>${info.width.toFixed(1)} × ${info.height.toFixed(1)} mm</strong> &bull; Componentes 3D: <strong>${info.top}</strong> Top, <strong>${info.bottom}</strong> Bot (Total: ${info.total_models})</span>
           `;
+          if (info.default_output) {
+            document.getElementById('output-dest').value = info.default_output;
+          }
         }
       } catch (e) {
         console.error(e);
@@ -529,7 +532,7 @@
         if (!exists) {
           const opt = document.createElement('option');
           opt.value = file;
-          opt.innerText = file.split('/').pop() + ' (' + file + ')';
+          opt.innerText = file.split(/[\\/]/).pop() + ' (' + file + ')';
           opt.selected = true;
           select.prepend(opt);
         }
@@ -602,6 +605,8 @@
 
     function setRunningState(isRunning) {
       document.getElementById('btn-render-all').disabled = isRunning;
+      const btnPrev = document.getElementById('btn-preview');
+      if (btnPrev) btnPrev.disabled = isRunning;
       document.getElementById('btn-cancel').disabled = !isRunning;
       const etaEl = document.getElementById('status-eta');
       if (isRunning) {

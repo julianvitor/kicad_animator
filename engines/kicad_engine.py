@@ -3,18 +3,21 @@ KiCad Animator - Motor de Renderização KiCad Nativo (kicad-cli / CPU Raytracin
 """
 
 import os
+import sys
 import re
 import math
 import random
 import shutil
 import tempfile
 import subprocess
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from core.config import (
     KICAD_CLI, FFMPEG, RES_MAP, STYLE_DESCRIPTIONS, categorize_ref
 )
 from core.progress import RenderProgressBar
+
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if sys.platform == "win32" else 0
 
 class KiCadNativePCBAnimator:
     def __init__(self, pcb_path, style="rain", mode="both", fps=60, resolution="1080p", workers=None, quality="basic"):
@@ -45,7 +48,7 @@ class KiCadNativePCBAnimator:
                     pts_x.append(float(match.group(1)))
                     pts_y.append(float(match.group(2)))
 
-        fp_pattern = re.compile(r"\t\(footprint\s+\"([^\"]+)\"[\s\S]*?\n\t\)")
+        fp_pattern = re.compile(r"(?:\t|  )\(footprint\s+\"([^\"]+)\"[\s\S]*?\n(?:\t|  )\)")
         self.footprints = []
         for m in fp_pattern.finditer(self.pcb_txt):
             blk = m.group(0)
@@ -276,7 +279,7 @@ class KiCadNativePCBAnimator:
             "-o", frame_png,
             frame_pcb
         ]
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, creationflags=NO_WINDOW)
 
         for ext in [".kicad_pcb", ".kicad_prl"]:
             p = frame_pcb.replace(".kicad_pcb", ext)
@@ -289,7 +292,7 @@ class KiCadNativePCBAnimator:
     def _render_all_frames(self, temp_dir, total_frames):
         completed = 0
         pbar = RenderProgressBar(total_frames, prefix="KiCad Nativo Render")
-        with ProcessPoolExecutor(max_workers=self.workers) as executor:
+        with ThreadPoolExecutor(max_workers=self.workers) as executor:
             futures = {executor.submit(self._render_frame_worker, temp_dir, i): i for i in range(total_frames)}
             for f in as_completed(futures):
                 f.result()
@@ -313,7 +316,7 @@ class KiCadNativePCBAnimator:
             "-pix_fmt", "yuv420p",
             output_mp4
         ]
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, creationflags=NO_WINDOW)
 
     def _encode_gif(self, input_mp4, output_gif):
         os.makedirs(os.path.dirname(os.path.abspath(output_gif)), exist_ok=True)
@@ -323,7 +326,7 @@ class KiCadNativePCBAnimator:
             "-vf", "fps=30,scale=1000:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3",
             output_gif
         ]
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, creationflags=NO_WINDOW)
 
     def generate(self, output_mp4, output_gif=None):
         temp_dir = tempfile.mkdtemp(prefix="kicad_anim_")
