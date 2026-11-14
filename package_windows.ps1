@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # KiCad Animator - Empacotador Standalone para Windows (.exe) com Blender (bpy)
 # ==============================================================================
 $ErrorActionPreference = "Stop"
@@ -22,6 +22,11 @@ if (Test-Path "KiCad-Animator.spec") { Remove-Item -Force "KiCad-Animator.spec" 
   --add-data "ui;ui" `
   --collect-all bpy `
   --collect-all numpy `
+  --collect-all pywebview `
+  --collect-all pythonnet `
+  --collect-all clr_loader `
+  --hidden-import "clr" `
+  --hidden-import "webview.platforms.winforms" `
   --hidden-import "logging.handlers" `
   --hidden-import "tomllib" `
   --hidden-import "xml.dom.minidom" `
@@ -30,6 +35,16 @@ if (Test-Path "KiCad-Animator.spec") { Remove-Item -Force "KiCad-Animator.spec" 
   main.py
 
 $DistDir = Join-Path $ScriptDir "dist\KiCad-Animator"
+$ConfigFile = Join-Path $DistDir "KiCad-Animator.exe.config"
+@'
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+  <runtime>
+    <loadFromRemoteSources enabled="true"/>
+  </runtime>
+</configuration>
+'@ | Set-Content -Path $ConfigFile -Encoding UTF8
+
 $ZipOut = Join-Path $ScriptDir "dist\KiCad-Animator-Windows-x64.zip"
 
 Compress-Archive -Path "$DistDir\*" -DestinationPath $ZipOut -Force

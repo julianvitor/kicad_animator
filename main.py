@@ -19,6 +19,15 @@ import argparse
 import tempfile
 import subprocess
 
+# Garante suporte a UTF-8 no console do Windows para evitar erros com emojis e caracteres especiais
+if sys.platform == "win32":
+    for stream in (sys.stdout, sys.stderr):
+        if stream and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+            except Exception:
+                pass
+
 # Auto-elevação para o ambiente Poetry / .venv local se o Python atual não possuir as dependências (bpy/pywebview)
 script_dir = os.path.dirname(os.path.abspath(__file__))
 is_win = sys.platform == "win32"

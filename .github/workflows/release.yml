@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -32,12 +33,25 @@ jobs:
             --add-data "ui;ui" `
             --collect-all bpy `
             --collect-all numpy `
+            --collect-all pywebview `
+            --collect-all pythonnet `
+            --collect-all clr_loader `
+            --hidden-import "clr" `
+            --hidden-import "webview.platforms.winforms" `
             --hidden-import "logging.handlers" `
             --hidden-import "tomllib" `
             --hidden-import "xml.dom.minidom" `
             --hidden-import "xml.etree.ElementTree" `
             --hidden-import "colorsys" `
             main.py
+          @'
+          <?xml version="1.0" encoding="utf-8" ?>
+          <configuration>
+            <runtime>
+              <loadFromRemoteSources enabled="true"/>
+            </runtime>
+          </configuration>
+          '@ | Set-Content -Path "dist\KiCad-Animator\KiCad-Animator.exe.config" -Encoding UTF8
           Compress-Archive -Path dist\KiCad-Animator -DestinationPath dist\KiCad-Animator-Windows-x64.zip
 
       - name: Upload Windows Asset
