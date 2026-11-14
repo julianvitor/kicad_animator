@@ -36,11 +36,26 @@ NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if sys.platform 
 
 class DesktopApi:
     def __init__(self):
-        self.window = None
-        self.active_proc = None
+        self._window = None
+        self._active_proc = None
 
-    def set_window(self, window):
-        self.window = window
+    def _set_window(self, window):
+        self._window = window
+
+    def _run_on_ui_thread(self, fn):
+        if sys.platform == "win32" and self._window and hasattr(self._window, "native"):
+            try:
+                import clr
+                from System import Func, Type
+                if self._window.native.InvokeRequired:
+                    res = [None]
+                    def _wrapper():
+                        res[0] = fn()
+                    self._window.native.Invoke(Func[Type](_wrapper))
+                    return res[0]
+            except Exception:
+                pass
+        return fn()
 
     def get_initial_data(self):
         pcbs = find_available_pcbs(ROOT_DIR)
@@ -86,40 +101,7 @@ class DesktopApi:
         return inspect_pcb_meta(pcb_path)
 
     def browse_pcb_file(self):
-        # 1. No Windows: processo isolado STA para evitar deadlock na thread WinForms do pywebview
-        if sys.platform == "win32":
-            ps_script = (
-                "Add-Type -AssemblyName System.Windows.Forms; "
-                "[System.Windows.Forms.Application]::EnableVisualStyles(); "
-                "$d = New-Object System.Windows.Forms.OpenFileDialog; "
-                "$d.Title = 'Selecione o arquivo da placa KiCad (.kicad_pcb)'; "
-                "$d.Filter = 'KiCad PCB (*.kicad_pcb)|*.kicad_pcb|Todos os arquivos (*.*)|*.*'; "
-                "$d.RestoreDirectory = $true; "
-                "$f = New-Object System.Windows.Forms.Form; "
-                "$f.TopMost = $true; "
-                "$res = $d.ShowDialog($f); "
-                "if ($res -eq [System.Windows.Forms.DialogResult]::OK) { "
-                "  [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
-                "  Write-Output $d.FileName "
-                "}"
-            )
-            try:
-                flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-                r = subprocess.run(
-                    ["powershell", "-NoProfile", "-STA", "-Command", ps_script],
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    creationflags=flags
-                )
-                if r.returncode == 0 and r.stdout.strip():
-                    return r.stdout.strip()
-                return None
-            except Exception:
-                pass
-
-        # 2. No macOS: AppleScript nativo
+        # 1. No macOS: AppleScript nativo
         if sys.platform == "darwin":
             try:
                 scpt = 'POSIX path of (choose file with prompt "Selecione o arquivo da placa KiCad (.kicad_pcb)" of type {"kicad_pcb", "public.data"})'
@@ -129,19 +111,25 @@ class DesktopApi:
             except Exception:
                 pass
 
-        # 3. Fallback nativo pywebview
+        # 2. Diálogo nativo do pywebview (executado na thread STA da UI no Windows)
         try:
-            if self.window:
-                res = self.window.create_file_dialog(
-                    webview.FileDialog.OPEN,
-                    file_types=("KiCad PCB (*.kicad_pcb)", "All files (*.*)")
+            if self._window:
+                kicad_dir = os.path.expanduser("~/Documents/KiCad")
+                init_dir = kicad_dir if os.path.isdir(kicad_dir) else os.path.expanduser("~")
+                res = self._run_on_ui_thread(
+                    lambda: self._window.create_file_dialog(
+                        webview.FileDialog.OPEN,
+                        directory=init_dir,
+                        file_types=("KiCad PCB (*.kicad_pcb)", "All files (*.*)")
+                    )
                 )
                 if res and len(res) > 0:
                     return res[0]
+                return None
         except Exception:
             pass
 
-        # 4. Fallback universal Tkinter (Linux)
+        # 3. Fallback universal Tkinter (Linux)
         try:
             import tkinter as tk
             from tkinter import filedialog
@@ -161,38 +149,7 @@ class DesktopApi:
         return None
 
     def browse_output_dir(self):
-        # 1. No Windows: processo isolado STA para evitar deadlock na thread WinForms do pywebview
-        if sys.platform == "win32":
-            ps_script = (
-                "Add-Type -AssemblyName System.Windows.Forms; "
-                "[System.Windows.Forms.Application]::EnableVisualStyles(); "
-                "$d = New-Object System.Windows.Forms.FolderBrowserDialog; "
-                "$d.Description = 'Selecione a pasta para exportação das animações'; "
-                "$f = New-Object System.Windows.Forms.Form; "
-                "$f.TopMost = $true; "
-                "$res = $d.ShowDialog($f); "
-                "if ($res -eq [System.Windows.Forms.DialogResult]::OK) { "
-                "  [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
-                "  Write-Output $d.SelectedPath "
-                "}"
-            )
-            try:
-                flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-                r = subprocess.run(
-                    ["powershell", "-NoProfile", "-STA", "-Command", ps_script],
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    creationflags=flags
-                )
-                if r.returncode == 0 and r.stdout.strip():
-                    return r.stdout.strip()
-                return None
-            except Exception:
-                pass
-
-        # 2. No macOS: AppleScript nativo
+        # 1. No macOS: AppleScript nativo
         if sys.platform == "darwin":
             try:
                 scpt = 'POSIX path of (choose folder with prompt "Selecione a pasta para exportação das animações")'
@@ -202,16 +159,24 @@ class DesktopApi:
             except Exception:
                 pass
 
-        # 3. Fallback nativo pywebview
+        # 2. Diálogo nativo do pywebview (executado na thread STA da UI no Windows)
         try:
-            if self.window:
-                res = self.window.create_file_dialog(webview.FileDialog.FOLDER)
+            if self._window:
+                kicad_dir = os.path.expanduser("~/Documents/KiCad")
+                init_dir = kicad_dir if os.path.isdir(kicad_dir) else os.path.expanduser("~")
+                res = self._run_on_ui_thread(
+                    lambda: self._window.create_file_dialog(
+                        webview.FileDialog.FOLDER,
+                        directory=init_dir
+                    )
+                )
                 if res and len(res) > 0:
                     return res[0]
+                return None
         except Exception:
             pass
 
-        # 4. Fallback universal Tkinter (Linux)
+        # 3. Fallback universal Tkinter (Linux)
         try:
             import tkinter as tk
             from tkinter import filedialog
@@ -269,7 +234,7 @@ class DesktopApi:
             self._emit_js("window.onProgress(100, 'Renderização concluída', '')")
 
     def render_still_frame(self, params):
-        if self.active_proc:
+        if self._active_proc:
             return {"status": "error", "message": "Já existe um processo em execução."}
 
         pcb = params.get("pcb")
@@ -319,7 +284,7 @@ class DesktopApi:
                     env=env,
                     creationflags=NO_WINDOW
                 )
-                self.active_proc = proc
+                self._active_proc = proc
 
                 for line in iter(proc.stdout.readline, ""):
                     if not line: break
@@ -341,13 +306,13 @@ class DesktopApi:
                 self._emit_log(f"❌ Erro crítico: {e}")
                 self._emit_js(f"window.onRenderComplete(false, {json.dumps(str(e))})")
             finally:
-                self.active_proc = None
+                self._active_proc = None
 
         threading.Thread(target=runner, daemon=True).start()
         return {"status": "started"}
 
     def start_full_render(self, params):
-        if self.active_proc:
+        if self._active_proc:
             return {"status": "error", "message": "Já existe um processo em execução."}
 
         pcb = params.get("pcb")
@@ -407,7 +372,7 @@ class DesktopApi:
                     env=env,
                     creationflags=NO_WINDOW
                 )
-                self.active_proc = proc
+                self._active_proc = proc
 
                 for line in iter(proc.stdout.readline, ""):
                     if not line: break
@@ -426,35 +391,35 @@ class DesktopApi:
                 self._emit_log(f"❌ Erro na renderização: {e}")
                 self._emit_js(f"window.onRenderComplete(false, {json.dumps(str(e))})")
             finally:
-                self.active_proc = None
+                self._active_proc = None
 
         threading.Thread(target=runner, daemon=True).start()
         return {"status": "started"}
 
     def cancel_render(self):
-        if self.active_proc:
+        if self._active_proc:
             try:
-                self.active_proc.terminate()
+                self._active_proc.terminate()
                 time.sleep(0.4)
-                if self.active_proc and self.active_proc.poll() is None:
-                    self.active_proc.kill()
+                if self._active_proc and self._active_proc.poll() is None:
+                    self._active_proc.kill()
                 self._emit_log("🛑 Processo cancelado.")
             except Exception as e:
                 self._emit_log(f"Erro ao cancelar: {e}")
-            self.active_proc = None
+            self._active_proc = None
             self._emit_js("window.onRenderComplete(false, 'Cancelado pelo usuário.')")
             return {"status": "cancelled"}
         return {"status": "idle"}
 
     def _emit_log(self, text):
-        if self.window and text:
+        if self._window and text:
             safe = json.dumps(text)
             self._emit_js(f"window.onLog({safe})")
 
     def _emit_js(self, code):
-        if self.window:
+        if self._window:
             try:
-                self.window.evaluate_js(code)
+                self._window.evaluate_js(code)
             except Exception:
                 pass
 
@@ -473,5 +438,5 @@ def launch_ui():
         min_size=(960, 700),
         background_color="#090d16"
     )
-    api.set_window(window)
+    api._set_window(window)
     webview.start(debug=False)

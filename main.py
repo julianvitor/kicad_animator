@@ -44,10 +44,8 @@ venv_candidates = [
 target_py = next((p for p in venv_candidates if os.path.exists(p)), None)
 
 if not getattr(sys, "frozen", False) and target_py and os.path.abspath(sys.executable) != os.path.abspath(target_py):
-    try:
-        import bpy
-        import webview
-    except ImportError:
+    import importlib.util
+    if not (importlib.util.find_spec("bpy") and importlib.util.find_spec("webview")):
         sys.exit(subprocess.call([target_py, os.path.abspath(__file__)] + sys.argv[1:], cwd=script_dir))
 
 from core.config import (

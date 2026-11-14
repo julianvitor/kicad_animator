@@ -7,16 +7,12 @@ import sys
 import re
 import shutil
 import subprocess
+import importlib.util
 
 # ---------------------------------------------------------------------------
-# Verificação de Runtime do Blender (bpy)
+# Verificação de Runtime do Blender (bpy) sem carregar o binário na thread da GUI
 # ---------------------------------------------------------------------------
-try:
-    import bpy
-    from mathutils import Vector
-    HAS_BPY = True
-except ImportError:
-    HAS_BPY = False
+HAS_BPY = importlib.util.find_spec("bpy") is not None
 
 # ---------------------------------------------------------------------------
 # Localização de Binários Essenciais (Multiplataforma: Linux, Windows, macOS)

@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # KiCad Animator - Inicializador Automatico para Windows (PowerShell)
 # ==============================================================================
 $ErrorActionPreference = "Stop"
@@ -95,19 +95,37 @@ if (-not (Get-Command "poetry" -ErrorAction SilentlyContinue)) {
 }
 
 # 4. Garante uso do ambiente virtual local e instala dependencias
-Write-Host "[Dependencias] Verificando dependencias do projeto..." -ForegroundColor Cyan
-try {
-    poetry config virtualenvs.in-project true --local
-    if (-not (Test-Path (Join-Path $ScriptDir ".venv"))) {
-        Write-Host "[Ambiente] Configurando ambiente virtual com $PythonExe..." -ForegroundColor Cyan
-        poetry env use $PythonExe
+$NeedsInstall = $true
+if (Test-Path $LocalVenvPy) {
+    try {
+        & $LocalVenvPy -c "import webview, numpy, bpy" 2>$null
+        if ($LASTEXITCODE -eq 0) { $NeedsInstall = $false }
+    } catch {}
+}
+
+if ($NeedsInstall) {
+    Write-Host "[Dependencias] Instalando/atualizando dependencias do projeto..." -ForegroundColor Cyan
+    try {
+        poetry config virtualenvs.in-project true --local
+        if (-not (Test-Path (Join-Path $ScriptDir ".venv"))) {
+            Write-Host "[Ambiente] Configurando ambiente virtual com $PythonExe..." -ForegroundColor Cyan
+            poetry env use $PythonExe
+        }
+        poetry install --no-interaction
+        & $LocalVenvPy -c "import bpy" 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            & $LocalVenvPy -m pip install bpy
+        }
+    } catch {
+        Write-Host "[ERRO] Falha ao instalar dependencias: $_" -ForegroundColor Red
+        Exit 1
     }
-    poetry install --no-interaction
-} catch {
-    Write-Host "[ERRO] Falha ao instalar dependencias: $_" -ForegroundColor Red
-    Exit 1
 }
 
 # 5. Inicia a Aplicacao
 Write-Host "[KiCad Animator] Iniciando KiCad Animator..." -ForegroundColor Green
-& poetry run python main.py $args
+if (Test-Path $LocalVenvPy) {
+    & $LocalVenvPy main.py @args
+} else {
+    & poetry run python main.py @args
+}
