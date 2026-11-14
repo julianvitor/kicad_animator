@@ -134,7 +134,7 @@ def get_best_python():
     # 2. Verifica ambiente Poetry ativo via CLI
     if POETRY_BIN:
         try:
-            res = subprocess.run([POETRY_BIN, "--directory", script_dir, "env", "info", "-e"], capture_output=True, text=True, cwd=script_dir)
+            res = subprocess.run([POETRY_BIN, "--directory", script_dir, "env", "info", "-e"], capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=script_dir)
             if res.returncode == 0 and res.stdout.strip() and os.path.exists(res.stdout.strip()):
                 return res.stdout.strip()
         except Exception:

@@ -33,7 +33,7 @@ def export_kicad_glb(pcb_path, output_glb):
         "-o", output_glb,
         pcb_path
     ]
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     if res.returncode != 0:
         print(f"❌ Erro ao exportar GLB do KiCad:\n{res.stderr}", file=sys.stderr, flush=True)
         sys.exit(1)

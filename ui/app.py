@@ -235,13 +235,19 @@ class DesktopApi:
 
         def runner():
             try:
+                env = os.environ.copy()
+                env["PYTHONIOENCODING"] = "utf-8"
+                env["PYTHONUTF8"] = "1"
                 proc = subprocess.Popen(
                     cmd,
                     cwd=ROOT_DIR,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
-                    bufsize=1
+                    encoding="utf-8",
+                    errors="replace",
+                    bufsize=1,
+                    env=env
                 )
                 self.active_proc = proc
 
@@ -316,13 +322,19 @@ class DesktopApi:
 
         def runner():
             try:
+                env = os.environ.copy()
+                env["PYTHONIOENCODING"] = "utf-8"
+                env["PYTHONUTF8"] = "1"
                 proc = subprocess.Popen(
                     cmd,
                     cwd=ROOT_DIR,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
-                    bufsize=1
+                    encoding="utf-8",
+                    errors="replace",
+                    bufsize=1,
+                    env=env
                 )
                 self.active_proc = proc
 
