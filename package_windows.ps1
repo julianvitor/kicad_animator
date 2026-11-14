@@ -1,4 +1,4 @@
-# ==============================================================================
+﻿# ==============================================================================
 # KiCad Animator - Empacotador Standalone para Windows (.exe) com Blender (bpy)
 # ==============================================================================
 $ErrorActionPreference = "Stop"
@@ -6,12 +6,29 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ScriptDir
 
+$UserScripts = Join-Path $env:APPDATA "Python\Scripts"
+$UserLocalBin = Join-Path $env:USERPROFILE ".local\bin"
+$PoetryBin = Join-Path $env:APPDATA "pypoetry\venv\Scripts"
+foreach ($p in @($UserScripts, $UserLocalBin, $PoetryBin)) {
+    if (Test-Path $p) { $env:Path = "$p;$env:Path" }
+}
+
 Write-Host "⚡ [KiCad Animator] Empacotando aplicativo standalone para Windows..." -ForegroundColor Cyan
 
 $Pyi = Join-Path $ScriptDir ".venv\Scripts\pyinstaller.exe"
+$Py = Join-Path $ScriptDir ".venv\Scripts\python.exe"
 if (-not (Test-Path $Pyi)) {
     Write-Host "📦 Instalando PyInstaller no ambiente local..." -ForegroundColor Yellow
     & poetry run pip install pyinstaller
+}
+try {
+    & $Py -c "import bpy" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "📦 Instalando bpy no ambiente local para empacotamento..." -ForegroundColor Yellow
+        & $Py -m pip install bpy
+    }
+} catch {
+    & $Py -m pip install bpy
 }
 
 if (Test-Path "build") { Remove-Item -Recurse -Force "build" }

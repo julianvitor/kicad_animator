@@ -111,4 +111,6 @@ O KiCad Animator detecta automaticamente as ferramentas em seus caminhos padrão
 | **KiCad** (`kicad-cli`) | `C:\Program Files\KiCad\*\bin\kicad-cli.exe` ou `PATH` | `/usr/bin/kicad-cli` ou `PATH` | `/Applications/KiCad/KiCad.app/...` ou `PATH` |
 | **FFmpeg** | `C:\ffmpeg\bin\ffmpeg.exe` ou `PATH` | `/usr/bin/ffmpeg` ou `PATH` | `brew install ffmpeg` ou `PATH` |
 | **Blender** *(opcional)* | `C:\Program Files\Blender Foundation\Blender*\blender.exe` | `/usr/bin/blender` ou `snap/flatpak` | `/Applications/Blender.app` ou `PATH` |
-| **Python** | `>= 3.10, < 3.14` | `>= 3.10, < 3.14` | `>= 3.10, < 3.14` |
+| **Python** *(código-fonte)* | `3.11`, `3.12` ou `3.13` (Recomendado: `3.13`) | `3.11`, `3.12` ou `3.13` (Recomendado: `3.13`) | `3.11`, `3.12` ou `3.13` (Recomendado: `3.13`) |
+
+> ⚠️ **Atenção sobre o Python:** Para executar a partir do código-fonte ou inicializadores (`run_windows.bat`, `run_unix.sh`), utilize o **Python 3.11, 3.12 ou 3.13**. O **Python 3.14+ ainda não possui suporte** pelo módulo oficial do Blender (`bpy`). Nos executáveis standalone prontos da aba Releases, o Python 3.13 e o Blender já vêm embutidos.
