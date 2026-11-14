@@ -10,7 +10,22 @@ Compatível com **Linux**, **Windows** e **macOS**.
 
 ---
 
-## 🚀 Inicialização em 1 Clique (Zero Configuração)
+## 📦 Executáveis Prontos (Standalone)
+
+Você pode baixar a versão compilada diretamente da aba [Releases](https://github.com/julianvitor/kicad_animator/releases):
+- **Windows (x64)**: `KiCad-Animator-Windows-x64.zip` (extraia e execute `KiCad-Animator.exe`)
+- **macOS (Apple Silicon & Intel)**: `KiCad-Animator-macOS.zip` (extraia e execute `KiCad-Animator.app`)
+
+> **Dica Windows:** Se extrair pelo Windows Explorer e o Windows bloquear arquivos baixados da internet, execute `Get-ChildItem -Recurse | Unblock-File` no PowerShell dentro da pasta extraída.
+
+### Gerar Executável Localmente
+
+- **Windows:** `.\package_windows.ps1`
+- **macOS:** `./package_mac.sh`
+
+---
+
+## 🚀 Inicialização em 1 Clique (Código-Fonte)
 
 Para não precisar digitar comandos ou instalar manualmente dependências e Poetry, use o inicializador correspondente ao seu sistema operacional:
 
