@@ -98,6 +98,10 @@ class BlenderPCBAnimator:
                     if gpus:
                         for d in cprefs.devices:
                             d.use = (d.type == device_type)
+                        # Em GPUs Intel Arc (ONEAPI), desativa Embree HWRT (use_oneapirt) para evitar
+                        # falhas de página DMA/IOMMU (HYPERVISOR_ERROR 0x00020001) ao reconstruir BVH dinâmico em 4K
+                        if device_type == "ONEAPI" and hasattr(cprefs, "use_oneapirt"):
+                            cprefs.use_oneapirt = False
                         gpu_names = ", ".join([d.name for d in gpus])
                         self.gpu_info = f"{gpu_names} [{device_type}]"
                         break
@@ -110,12 +114,21 @@ class BlenderPCBAnimator:
             self.scene.cycles.device = "GPU"
             self.scene.cycles.samples = self.samples
             self.scene.cycles.use_denoising = True
+            if hasattr(self.scene.cycles, "denoising_use_gpu"):
+                self.scene.cycles.denoising_use_gpu = False
+            if hasattr(self.scene.cycles, "use_auto_tile"):
+                self.scene.cycles.use_auto_tile = True
+            if hasattr(self.scene.cycles, "tile_size"):
+                self.scene.cycles.tile_size = 512 if max(self.width, self.height) >= 2560 else 1024
         else:
             self.scene.render.engine = "BLENDER_EEVEE"
             if hasattr(self.scene.eevee, "taa_render_samples"):
                 self.scene.eevee.taa_render_samples = self.samples
             if self.gpu_info == "CPU (Fallback)":
                 self.gpu_info = f"Hardware Rasterization ({sys_backend})"
+
+        if hasattr(self.scene.render, "use_persistent_data"):
+            self.scene.render.use_persistent_data = True
 
         self.scene.render.resolution_x = self.width
         self.scene.render.resolution_y = self.height
@@ -634,6 +647,12 @@ class BlenderPCBAnimator:
             print("-"*60 + "\n", flush=True)
 
         finally:
+            try:
+                import gc
+                bpy.ops.wm.read_factory_settings(use_empty=True)
+                gc.collect()
+            except Exception:
+                pass
             shutil.rmtree(temp_dir, ignore_errors=True)
 
     def _encode_video(self, temp_dir, total_frames, output_mp4):
