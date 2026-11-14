@@ -89,7 +89,7 @@ class BlenderPCBAnimator:
         if prefs:
             cprefs = prefs.preferences
             cprefs.get_devices()
-            for device_type in ("METAL", "CUDA", "OPTIX", "HIP", "ONEAPI"):
+            for device_type in ("OPTIX", "CUDA", "METAL", "HIP", "ONEAPI"):
                 try:
                     cprefs.compute_device_type = device_type
                     gpus = [d for d in cprefs.devices if d.type == device_type]
@@ -110,6 +110,8 @@ class BlenderPCBAnimator:
             self.scene.cycles.use_denoising = True
         else:
             self.scene.render.engine = "BLENDER_EEVEE"
+            if hasattr(self.scene.eevee, "taa_render_samples"):
+                self.scene.eevee.taa_render_samples = self.samples
             if self.gpu_info == "CPU (Fallback)":
                 self.gpu_info = f"Hardware Rasterization ({sys_backend})"
 
@@ -118,6 +120,9 @@ class BlenderPCBAnimator:
         self.scene.render.resolution_percentage = 100
         self.scene.render.fps = self.fps
         self.scene.render.image_settings.file_format = "PNG"
+        # Zero compressão zlib: como são quadros intermediários temporários que o FFmpeg
+        # compilará em MP4, desligar a compressão evita que a CPU afunile e deixe a GPU ociosa
+        self.scene.render.image_settings.compression = 0
 
         # Gerenciamento de Cores Profissional AgX
         self.scene.view_settings.view_transform = "AgX"
