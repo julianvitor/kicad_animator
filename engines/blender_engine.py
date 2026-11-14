@@ -113,13 +113,24 @@ class BlenderPCBAnimator:
             self.scene.render.engine = "CYCLES"
             self.scene.cycles.device = "GPU"
             self.scene.cycles.samples = self.samples
-            self.scene.cycles.use_denoising = True
-            if hasattr(self.scene.cycles, "denoising_use_gpu"):
-                self.scene.cycles.denoising_use_gpu = False
+            # Desativa OpenImageDenoise (OIDN) em animações: em 4K o OIDN executa rede neural AVX2/SYCL
+            # pesada a cada quadro que sobrecarrega CPU/VRAM e pode causar TDR ou falha de Hypervisor/CPU
+            self.scene.cycles.use_denoising = False
+            if hasattr(self.scene.cycles, "use_adaptive_sampling"):
+                self.scene.cycles.use_adaptive_sampling = True
+                self.scene.cycles.adaptive_threshold = 0.05
+            if hasattr(self.scene.cycles, "max_bounces"):
+                self.scene.cycles.max_bounces = 4
+                self.scene.cycles.diffuse_bounces = 2
+                self.scene.cycles.glossy_bounces = 2
+                self.scene.cycles.transmission_bounces = 2
+            if hasattr(self.scene.cycles, "sample_clamp_direct"):
+                self.scene.cycles.sample_clamp_direct = 10.0
+                self.scene.cycles.sample_clamp_indirect = 3.0
             if hasattr(self.scene.cycles, "use_auto_tile"):
                 self.scene.cycles.use_auto_tile = True
             if hasattr(self.scene.cycles, "tile_size"):
-                self.scene.cycles.tile_size = 512 if max(self.width, self.height) >= 2560 else 1024
+                self.scene.cycles.tile_size = 256 if max(self.width, self.height) >= 2560 else 512
         else:
             self.scene.render.engine = "BLENDER_EEVEE"
             if hasattr(self.scene.eevee, "taa_render_samples"):
@@ -129,6 +140,9 @@ class BlenderPCBAnimator:
 
         if hasattr(self.scene.render, "use_persistent_data"):
             self.scene.render.use_persistent_data = True
+        if hasattr(self.scene.render, "threads_mode"):
+            self.scene.render.threads_mode = "FIXED"
+            self.scene.render.threads = max(2, min(6, (os.cpu_count() or 4) // 2))
 
         self.scene.render.resolution_x = self.width
         self.scene.render.resolution_y = self.height
@@ -520,8 +534,16 @@ class BlenderPCBAnimator:
             sign = -1.0 if is_bottom else 1.0
             drop_height = max(0.05, min(0.12, self.board_w * 0.7))
 
-            # 1. Invisível desde o frame 1 até imediatamente antes do spawn
-            obj.scale = Vector((0.0, 0.0, 0.0))
+            # 1. Invisível desde o frame 1 até imediatamente antes do spawn (exclui do BVH do Cycles via hide_render)
+            for target_o in [obj] + list(obj.children_recursive):
+                target_o.hide_render = True
+                target_o.keyframe_insert(data_path="hide_render", frame=1)
+                if int(spawn_f - 1) > 1:
+                    target_o.keyframe_insert(data_path="hide_render", frame=int(spawn_f - 1))
+                target_o.hide_render = False
+                target_o.keyframe_insert(data_path="hide_render", frame=int(spawn_f))
+
+            obj.scale = Vector((0.001, 0.001, 0.001))
             obj.keyframe_insert(data_path="scale", frame=1)
             if int(spawn_f - 1) > 1:
                 obj.keyframe_insert(data_path="scale", frame=int(spawn_f - 1))
@@ -590,6 +612,13 @@ class BlenderPCBAnimator:
         return out_file
 
     def generate(self, output_mp4, output_gif=None):
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                # Define prioridade BELOW_NORMAL_PRIORITY_CLASS (0x00004000) para nunca travar o Windows/UI durante render 4K
+                ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x00004000)
+            except Exception:
+                pass
         temp_dir = tempfile.mkdtemp(prefix="kicad_bpy_anim_")
         try:
             total_frames = self._calculate_timeline()
@@ -630,6 +659,9 @@ class BlenderPCBAnimator:
                 self.scene.render.filepath = frame_png
                 bpy.ops.render.render(write_still=True)
                 pbar.update(current=f)
+                if self.engine == "cycles":
+                    import time
+                    time.sleep(0.04)
             pbar.close("Todos os quadros renderizados")
 
             print("\n🎬 Codificando vídeo MP4 final com FFmpeg...", flush=True)
