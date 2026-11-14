@@ -83,6 +83,50 @@ class DesktopApi:
         return inspect_pcb_meta(pcb_path)
 
     def browse_pcb_file(self):
+        # 1. No Windows: processo isolado STA para evitar deadlock na thread WinForms do pywebview
+        if sys.platform == "win32":
+            ps_script = (
+                "Add-Type -AssemblyName System.Windows.Forms; "
+                "[System.Windows.Forms.Application]::EnableVisualStyles(); "
+                "$d = New-Object System.Windows.Forms.OpenFileDialog; "
+                "$d.Title = 'Selecione o arquivo da placa KiCad (.kicad_pcb)'; "
+                "$d.Filter = 'KiCad PCB (*.kicad_pcb)|*.kicad_pcb|Todos os arquivos (*.*)|*.*'; "
+                "$d.RestoreDirectory = $true; "
+                "$f = New-Object System.Windows.Forms.Form; "
+                "$f.TopMost = $true; "
+                "$res = $d.ShowDialog($f); "
+                "if ($res -eq [System.Windows.Forms.DialogResult]::OK) { "
+                "  [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+                "  Write-Output $d.FileName "
+                "}"
+            )
+            try:
+                flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+                r = subprocess.run(
+                    ["powershell", "-NoProfile", "-STA", "-Command", ps_script],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    creationflags=flags
+                )
+                if r.returncode == 0 and r.stdout.strip():
+                    return r.stdout.strip()
+                return None
+            except Exception:
+                pass
+
+        # 2. No macOS: AppleScript nativo
+        if sys.platform == "darwin":
+            try:
+                scpt = 'POSIX path of (choose file with prompt "Selecione o arquivo da placa KiCad (.kicad_pcb)" of type {"kicad_pcb", "public.data"})'
+                r = subprocess.run(["osascript", "-e", scpt], capture_output=True, text=True)
+                if r.returncode == 0 and r.stdout.strip():
+                    return r.stdout.strip()
+            except Exception:
+                pass
+
+        # 3. Fallback nativo pywebview
         try:
             if self.window:
                 res = self.window.create_file_dialog(
@@ -94,17 +138,7 @@ class DesktopApi:
         except Exception:
             pass
 
-        # Fallback AppleScript no macOS
-        if sys.platform == "darwin":
-            try:
-                scpt = 'POSIX path of (choose file with prompt "Selecione o arquivo da placa KiCad (.kicad_pcb)" of type {"kicad_pcb", "public.data"})'
-                r = subprocess.run(["osascript", "-e", scpt], capture_output=True, text=True)
-                if r.returncode == 0 and r.stdout.strip():
-                    return r.stdout.strip()
-            except Exception:
-                pass
-
-        # Fallback universal Tkinter (Windows, Linux, macOS)
+        # 4. Fallback universal Tkinter (Linux)
         try:
             import tkinter as tk
             from tkinter import filedialog
@@ -124,15 +158,38 @@ class DesktopApi:
         return None
 
     def browse_output_dir(self):
-        try:
-            if self.window:
-                res = self.window.create_file_dialog(webview.FileDialog.FOLDER)
-                if res and len(res) > 0:
-                    return res[0]
-        except Exception:
-            pass
+        # 1. No Windows: processo isolado STA para evitar deadlock na thread WinForms do pywebview
+        if sys.platform == "win32":
+            ps_script = (
+                "Add-Type -AssemblyName System.Windows.Forms; "
+                "[System.Windows.Forms.Application]::EnableVisualStyles(); "
+                "$d = New-Object System.Windows.Forms.FolderBrowserDialog; "
+                "$d.Description = 'Selecione a pasta para exportação das animações'; "
+                "$f = New-Object System.Windows.Forms.Form; "
+                "$f.TopMost = $true; "
+                "$res = $d.ShowDialog($f); "
+                "if ($res -eq [System.Windows.Forms.DialogResult]::OK) { "
+                "  [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+                "  Write-Output $d.SelectedPath "
+                "}"
+            )
+            try:
+                flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+                r = subprocess.run(
+                    ["powershell", "-NoProfile", "-STA", "-Command", ps_script],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    creationflags=flags
+                )
+                if r.returncode == 0 and r.stdout.strip():
+                    return r.stdout.strip()
+                return None
+            except Exception:
+                pass
 
-        # Fallback AppleScript no macOS
+        # 2. No macOS: AppleScript nativo
         if sys.platform == "darwin":
             try:
                 scpt = 'POSIX path of (choose folder with prompt "Selecione a pasta para exportação das animações")'
@@ -142,7 +199,16 @@ class DesktopApi:
             except Exception:
                 pass
 
-        # Fallback universal Tkinter (Windows, Linux, macOS)
+        # 3. Fallback nativo pywebview
+        try:
+            if self.window:
+                res = self.window.create_file_dialog(webview.FileDialog.FOLDER)
+                if res and len(res) > 0:
+                    return res[0]
+        except Exception:
+            pass
+
+        # 4. Fallback universal Tkinter (Linux)
         try:
             import tkinter as tk
             from tkinter import filedialog
