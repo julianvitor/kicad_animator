@@ -1,6 +1,6 @@
 # KiCad Animator (3D Studio)
 
-> **Crie vídeos e GIFs animados em 3D cinematográficos a partir das suas placas de circuito impresso do KiCad.**  
+> **Crie vídeos e GIFs animados em 3D a partir das suas placas de circuito impresso do KiCad.**  
 > *Create cinematic 3D animated videos and GIFs directly from your KiCad PCB projects.*
 
 <p align="center">
@@ -16,7 +16,7 @@
 ## 🌐 Português
 
 ### 💡 O que é o KiCad Animator?
-O **KiCad Animator** é um aplicativo feito para transformar suas placas de circuito impresso do KiCad em animações 3D incríveis e profissionais, prontas para postar no LinkedIn, Instagram, sites e apresentações.
+O **KiCad Animator** é um aplicativo feito para transformar suas placas de circuito impresso do KiCad em videos animados. 
 
 Você não precisa ser especialista em 3D: basta carregar o arquivo da sua placa (`.kicad_pcb`) e escolher uma das animações prontas:
 - 🌧️ **Chuva Gravitacional (Rain):** os componentes 3D caem do céu e se encaixam na placa com impacto e rotação.
@@ -28,12 +28,11 @@ Você não precisa ser especialista em 3D: basta carregar o arquivo da sua placa
 ---
 
 ### 📦 Como Instalar (Pronto para Usar)
-Você **não precisa instalar Python nem usar o terminal**. Basta baixar a versão pronta para o seu sistema:
 
 1. Acesse a página de **[Releases](https://github.com/julianvitor/kicad_animator/releases)**.
 2. Baixe o pacote do seu sistema operacional:
    - **Windows:** Baixe `KiCad-Animator-Windows-x64.zip`, extraia a pasta e clique duas vezes em `KiCad-Animator.exe`.
-   - **macOS:** Baixe `KiCad-Animator-macOS.zip`, extraia e abra o `KiCad-Animator.app`.
+   - **macOS:** Baixe `KiCad-Animator-macOS.zip`, extraia e abra o `KiCad-Animator.app` (na primeira execução, pode ser necessário autorizar a abertura em *Ajustes do Sistema > Privacidade e Segurança*). 
 3. Pronto! O programa já vem com tudo embutido.
 
 ---
@@ -120,7 +119,7 @@ You **do not need Python or terminal knowledge**. Simply download the standalone
 1. Go to the **[Releases](https://github.com/julianvitor/kicad_animator/releases)** page.
 2. Download the package for your OS:
    - **Windows:** Download `KiCad-Animator-Windows-x64.zip`, extract it, and double-click `KiCad-Animator.exe`.
-   - **macOS:** Download `KiCad-Animator-macOS.zip`, extract it, and launch `KiCad-Animator.app`.
+   - **macOS:** Download `KiCad-Animator-macOS.zip`, extract it, and launch `KiCad-Animator.app` (on first launch, you may need to allow it in *System Settings > Privacy & Security*).
 3. That's it! Everything is self-contained.
 
 ---
