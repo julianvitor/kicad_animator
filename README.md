@@ -2,11 +2,25 @@
 
 Gerador universal e cinemático de animações 3D para circuitos impressos projetados no KiCad (KiCad 7, 8, 9 e 10).
 
+<p align="center">
+  <img src="docs/assets/demo_jardim.gif" alt="Animação 3D da PCB Jardim - Chuva Gravitacional" width="100%">
+</p>
+
 Possui dois motores de renderização integrados:
 1. **Blender 3D (GPU PBR)**: Renderização com materiais realistas, iluminação de estúdio profissional com color grading AgX e animação procedural de componentes (chuva gravitacional, onda radial, montagem SMT, vórtice 3D).
 2. **KiCad Nativo (CPU)**: Renderizador interno via `kicad-cli` com raytracing multi-core paralelo (sem necessidade de Blender instalado).
 
 Compatível com **Linux**, **Windows** e **macOS**.
+
+---
+
+## 🖥️ Interface Gráfica Studio
+
+A aplicação conta com uma interface desktop moderna em modo escuro com pré-visualização em tempo real, monitoramento de progresso, console integrado e detecção automática de aceleração por hardware (GPU Metal / OptiX / CUDA):
+
+<p align="center">
+  <img src="docs/assets/ui_studio.png" alt="KiCad Animator 3D Studio - Interface Desktop" width="100%">
+</p>
 
 ---
 
