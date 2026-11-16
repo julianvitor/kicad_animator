@@ -110,14 +110,23 @@ def prompt_terminal_interactive():
 
     # 3. Estilo de Animação
     print("\n🎨 Escolha o estilo da animação:")
-    print("  [1] Chuva Linear Gravitacional (Rain)       - Ondas de componentes caindo com gravidade e rebote (Padrão)")
-    print("  [2] Onda Radial do Centro (Ripple)          - Expansão concêntrica circular do centro para as bordas")
-    print("  [3] Linha de Montagem SMT por Categoria     - Passivos (R/C/D) -> CIs/Chips -> Conectores/Mecânicos")
-    print("  [4] Vórtice Magnético Espiral 3D (Vortex)   - Componentes descem em redemoinho espiral 3D suave")
-    print("  [5] 🌟 GERAR TODOS OS 4 ESTILOS EM LOTE (All) - Renderiza todas as animações sequencialmente")
+    print("  [1]  Chuva Linear Gravitacional (Rain)       - Ondas de componentes caindo com gravidade e rebote (Padrão)")
+    print("  [2]  Onda Radial do Centro (Ripple)          - Expansão concêntrica circular do centro para as bordas")
+    print("  [3]  Linha de Montagem SMT por Categoria     - Passivos (R/C/D) -> CIs/Chips -> Conectores/Mecânicos")
+    print("  [4]  Vórtice Magnético Espiral 3D (Vortex)   - Componentes descem em redemoinho espiral 3D suave")
+    print("  [5]  Visão Explodida Técnica (Exploded)      - Componentes levitam em camadas por categoria e retornam")
+    print("  [6]  Varredura Laser Sci-Fi (Laser Scan)     - Materialização diagonal rápida com efeito elástico")
+    print("  [7]  Implosão Magnética (Constellation)      - Componentes flutuam em constelação 3D e convergem na placa")
+    print("  [8]  Showcase Cinemático 360° (Turntable)    - Giro orbital de 360° com aproximação macro nos detalhes")
+    print("  [9]  Fluxo de Energia e Sinal (Signal Flow)  - Montagem seguindo a topologia elétrica (Entrada -> CIs -> Sinais)")
+    print("  [10] 🌟 GERAR TODOS OS 9 ESTILOS EM LOTE (All) - Renderiza todas as animações sequencialmente")
 
-    style_choices = {"1": "rain", "2": "radial", "3": "assembly", "4": "vortex", "5": "all"}
-    s_choice = input("\nEstilo [1-5] (Padrão: 1): ").strip()
+    style_choices = {
+        "1": "rain", "2": "radial", "3": "assembly", "4": "vortex",
+        "5": "exploded", "6": "scan", "7": "implode", "8": "turntable",
+        "9": "signal", "10": "all"
+    }
+    s_choice = input("\nEstilo [1-10] (Padrão: 1): ").strip()
     style = style_choices.get(s_choice, "rain")
 
     # 4. Faces da Placa (Modo)

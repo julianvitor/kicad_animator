@@ -18,12 +18,16 @@
 ### 💡 O que é o KiCad Animator?
 O **KiCad Animator** é um aplicativo feito para transformar suas placas de circuito impresso do KiCad em videos animados. 
 
-Você não precisa ser especialista em 3D: basta carregar o arquivo da sua placa (`.kicad_pcb`) e escolher uma das animações prontas:
-- 🌧️ **Chuva Gravitacional (Rain):** os componentes 3D caem do céu e se encaixam na placa com impacto e rotação.
-- 🌊 **Onda Radial (Wave):** os componentes surgem em uma onda expansiva a partir do centro da placa.
+Você não precisa ser especialista em 3D: basta carregar o arquivo da sua placa (`.kicad_pcb`) e escolher uma das 9 animações prontas:
+- 🌧️ **Chuva Gravitacional (Rain):** os componentes 3D caem do céu e se encaixam na placa com impacto e rebote.
+- 🌊 **Onda Radial (Ripple):** os componentes surgem em uma onda expansiva a partir do centro da placa.
 - ⚙️ **Montagem SMT:** simulação do processo de montagem sequencial de componentes na fábrica.
 - 🌀 **Vórtice 3D:** componentes orbitam em espiral até pousarem nos seus devidos lugares.
-- 🔄 **Giros 360° e 180°:** rotações suaves para mostrar a frente e o verso da sua placa.
+- 🔍 **Visão Explodida Técnica (Exploded):** os componentes levitam em camadas de altura proporcional para inspeção técnica e retornam.
+- 🚨 **Varredura Laser Sci-Fi (Laser Scan):** materialização rápida em linha diagonal com efeito elástico holográfico.
+- 🌌 **Implosão Magnética (Constellation):** componentes flutuam em uma constelação 3D ao redor e são puxados magneticamente para a placa.
+- 🎬 **Showcase Cinemático 360° (Turntable):** giro orbital completo de 360° com aproximação macro nos componentes.
+- ⚡ **Fluxo de Energia (Signal Flow):** montagem seguindo a ordem elétrica do circuito (conectores $\to$ potência $\to$ CIs $\to$ sinais).
 
 ---
 
@@ -104,12 +108,16 @@ poetry run kicad-animator -i
 ### 💡 What is KiCad Animator?
 **KiCad Animator** turns your KiCad PCB designs into eye-catching, cinematic 3D animated videos and GIFs ready for social media, portfolios, product showcases, and client presentations.
 
-No 3D modeling skills required: just load your `.kicad_pcb` file and pick a pre-built animation:
+No 3D modeling skills required: just load your `.kicad_pcb` file and pick from 9 pre-built animations:
 - 🌧️ **Gravity Rain:** 3D components fall onto the PCB and snap into place with realistic landing bounces.
 - 🌊 **Radial Wave:** Components assemble outwards in a wave effect from the center of the board.
-- ⚙️ **SMT Assembly:** Simulates automated pick-and-place manufacturing.
+- ⚙️ **SMT Assembly:** Simulates automated pick-and-place manufacturing by component category.
 - 🌀 **3D Vortex:** Components spiral down smoothly onto their footprints.
-- 🔄 **360° & 180° Showcases:** Smooth camera spins highlighting the front and back of your board.
+- 🔍 **Exploded View:** Components levitate into proportional height layers for technical inspection and reassemble.
+- 🚨 **Laser Scan:** Diagonal sci-fi sweep that materializes components with a holographic pop.
+- 🌌 **Magnetic Implode:** Components float in a 3D constellation halo and magnetically converge onto the PCB.
+- 🎬 **360° Turntable Showcase:** Full 360° orbital camera spin with dynamic macro close-ups.
+- ⚡ **Signal Flow:** Assembles following electrical topology (connectors $\to$ power $\to$ ICs $\to$ passives/LEDs).
 
 ---
 

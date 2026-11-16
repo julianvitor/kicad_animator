@@ -11,7 +11,8 @@ import tempfile
 import subprocess
 
 from core.config import (
-    HAS_BPY, KICAD_CLI, FFMPEG, RES_MAP, STYLE_DESCRIPTIONS, categorize_ref
+    HAS_BPY, KICAD_CLI, FFMPEG, RES_MAP, STYLE_DESCRIPTIONS,
+    categorize_ref, categorize_signal_stage
 )
 from core.progress import RenderProgressBar
 
@@ -389,14 +390,17 @@ class BlenderPCBAnimator:
                 self.spawn_timings[ref] = None
                 continue
 
+            norm_x = (fp["x"] - self.meta.min_x) / max(1.0, self.meta.width)
+            norm_y = (fp["y"] - self.meta.min_y) / max(1.0, self.meta.height)
+            dist = math.hypot(fp["x"] - self.meta.center_x, fp["y"] - self.meta.center_y)
+            norm_r = dist / max(1.0, self.meta.max_radius)
+
             if self.style == "rain":
-                norm = (fp["x"] - self.meta.min_x) / self.meta.width
+                norm = norm_x
             elif self.style == "radial":
-                dist = math.hypot(fp["x"] - self.meta.center_x, fp["y"] - self.meta.center_y)
-                norm = dist / max(1.0, self.meta.max_radius)
+                norm = norm_r
             elif self.style == "assembly":
                 cat = fp["category"]
-                norm_x = (fp["x"] - self.meta.min_x) / self.meta.width
                 if cat == 1:
                     norm = 0.0 + 0.30 * norm_x
                 elif cat == 2:
@@ -404,15 +408,28 @@ class BlenderPCBAnimator:
                 else:
                     norm = 0.70 + 0.30 * norm_x
             elif self.style == "vortex":
-                dist = math.hypot(fp["x"] - self.meta.center_x, fp["y"] - self.meta.center_y)
-                norm_r = dist / max(1.0, self.meta.max_radius)
-                norm_x = (fp["x"] - self.meta.min_x) / self.meta.width
                 norm = 0.6 * norm_x + 0.4 * norm_r
+            elif self.style == "scan":
+                norm = 0.7 * norm_x + 0.3 * norm_y
+            elif self.style == "signal":
+                stg = categorize_signal_stage(ref)
+                if stg == 1:
+                    norm = 0.00 + 0.20 * norm_x
+                elif stg == 2:
+                    norm = 0.25 + 0.22 * norm_x
+                elif stg == 3:
+                    norm = 0.52 + 0.22 * norm_x
+                else:
+                    norm = 0.78 + 0.22 * norm_x
+            elif self.style == "implode":
+                norm = 1.0 - norm_r
+            elif self.style in ("exploded", "turntable"):
+                norm = 0.0
             else:
-                norm = (fp["x"] - self.meta.min_x) / self.meta.width
+                norm = norm_x
 
             norm = max(0.0, min(1.0, norm))
-            jitter = random.uniform(-4.0, 4.0)
+            jitter = 0.0 if self.style in ("scan", "exploded", "turntable") else random.uniform(-4.0, 4.0)
 
             if fp["layer"] == "B.Cu":
                 if self.mode == "both":
@@ -440,6 +457,44 @@ class BlenderPCBAnimator:
             cz = d * math.sin(elev)
             self.cam_obj.location = Vector((cx, cy, cz))
             self.cam_obj.keyframe_insert(data_path="location", frame=frame)
+
+        if self.style == "turntable":
+            steps = max(24, int(self.total_frames / 4))
+            for i in range(steps + 1):
+                f = max(1, min(self.total_frames, int(1 + (self.total_frames - 1) * (i / float(steps)))))
+                p = i / float(steps)
+                azim = 20.0 + 360.0 * p
+                zoom_factor = 0.96 - 0.16 * math.sin(p * math.pi)
+                if self.mode == "both":
+                    elev = -34.0 * math.cos(p * math.pi) + 6.0 * math.sin(p * 2.0 * math.pi)
+                elif self.mode == "bottom":
+                    elev = -34.0 + 10.0 * math.sin(p * math.pi)
+                else:
+                    elev = 34.0 - 10.0 * math.sin(p * math.pi)
+                set_cam(f, elev, azim, dist * zoom_factor)
+            return
+
+        if self.style == "exploded":
+            if self.mode == "both":
+                set_cam(1, -36.0, 22.0)
+                set_cam(int(self.act1_end * 0.5), -24.0, 58.0, dist * 1.18)
+                set_cam(self.act1_end, -35.0, 30.0)
+                set_cam(int(self.act1_end + 0.35 * (self.act2_end - self.act1_end)), 0.0, 70.0, dist * 1.18)
+                set_cam(self.act2_end, 35.0, 25.0)
+                set_cam(int(self.act2_end + 0.52 * (self.act3_end - self.act2_end)), 24.0, 62.0, dist * 1.18)
+                set_cam(self.act3_end, 37.0, 28.0)
+                set_cam(self.total_frames, 39.0, 20.0)
+            elif self.mode == "top":
+                set_cam(1, 36.0, 22.0)
+                set_cam(int(self.act3_end * 0.52), 24.0, 62.0, dist * 1.18)
+                set_cam(self.act3_end, 37.0, 28.0)
+                set_cam(self.total_frames, 39.5, 20.0)
+            else:
+                set_cam(1, -36.0, 22.0)
+                set_cam(int(self.act1_end * 0.52), -24.0, 62.0, dist * 1.18)
+                set_cam(self.act1_end, -37.0, 28.0)
+                set_cam(self.total_frames, -39.5, 20.0)
+            return
 
         if self.mode == "both":
             set_cam(1, -38.0, 25.0)
@@ -473,7 +528,7 @@ class BlenderPCBAnimator:
         fall_frames = int(0.35 * self.fps)
         bounce_frames = int(0.14 * self.fps)
 
-        for obj in self.comp_roots:
+        for idx, obj in enumerate(self.comp_roots):
             orig_loc = obj.location.copy()
             orig_scale = obj.scale.copy()
             obj_z = obj.location.z
@@ -485,20 +540,81 @@ class BlenderPCBAnimator:
             if not is_bottom and self.mode == "bottom":
                 continue
 
+            sign = -1.0 if is_bottom else 1.0
+            drop_height = max(0.05, min(0.12, self.board_w * 0.7))
+
+            # Estilo Turntable: placa 100% montada desde o início
+            if self.style == "turntable":
+                for target_o in [obj] + list(obj.children_recursive):
+                    target_o.hide_render = False
+                obj.location = orig_loc
+                obj.scale = orig_scale
+                continue
+
+            # Estilo Exploded View: componentes montados que levitam em camadas por categoria e retornam
+            if self.style == "exploded":
+                for target_o in [obj] + list(obj.children_recursive):
+                    target_o.hide_render = False
+                obj.scale = orig_scale
+
+                cat = categorize_ref(obj.name)
+                if cat == 1:
+                    layer_h = 0.25 * drop_height
+                elif cat == 2:
+                    layer_h = 0.50 * drop_height
+                else:
+                    layer_h = 0.76 * drop_height
+
+                if is_bottom:
+                    t_start, t_end = 1, self.act1_end
+                else:
+                    t_start = self.act2_end if self.mode == "both" else 1
+                    t_end = self.act3_end
+
+                dur = max(10, t_end - t_start)
+                f_hold_start = int(t_start + 0.10 * dur)
+                f_open = int(t_start + 0.38 * dur)
+                f_hold_end = int(t_start + 0.68 * dur)
+                f_close = int(t_start + 0.90 * dur)
+                f_bounce = int(t_start + 0.96 * dur)
+
+                obj.location = orig_loc
+                obj.keyframe_insert(data_path="location", frame=1)
+                if f_hold_start > 1:
+                    obj.keyframe_insert(data_path="location", frame=f_hold_start)
+
+                obj.location = orig_loc + Vector((0, 0, sign * layer_h))
+                obj.keyframe_insert(data_path="location", frame=f_open)
+                obj.keyframe_insert(data_path="location", frame=f_hold_end)
+
+                obj.location = orig_loc
+                obj.keyframe_insert(data_path="location", frame=f_close)
+
+                obj.location = orig_loc + Vector((0, 0, sign * 0.002))
+                obj.keyframe_insert(data_path="location", frame=int((f_close + f_bounce) / 2))
+
+                obj.location = orig_loc
+                obj.keyframe_insert(data_path="location", frame=f_bounce)
+                obj.keyframe_insert(data_path="location", frame=self.total_frames)
+                continue
+
             # Prioriza tempo pré-calculado pelo footprint KiCad se disponível
             if hasattr(self, "spawn_timings") and obj.name in self.spawn_timings and self.spawn_timings[obj.name] is not None:
                 spawn_f = self.spawn_timings[obj.name]
             else:
                 obj_x = obj.location.x
                 obj_y = obj.location.y
+                norm_x = (obj_x - (-self.board_w / 2.0)) / max(0.01, self.board_w)
+                norm_y = (obj_y - (-self.board_h / 2.0)) / max(0.01, self.board_h)
+                dist = math.hypot(obj_x, obj_y)
+                norm_r = dist / max(0.01, math.hypot(self.board_w / 2.0, self.board_h / 2.0))
+
                 if self.style == "rain":
-                    norm = (obj_x - (-self.board_w / 2.0)) / max(0.01, self.board_w)
+                    norm = norm_x
                 elif self.style == "radial":
-                    dist = math.hypot(obj_x, obj_y)
-                    norm = dist / max(0.01, math.hypot(self.board_w / 2.0, self.board_h / 2.0))
+                    norm = norm_r
                 elif self.style == "assembly":
                     cat = categorize_ref(obj.name)
-                    norm_x = (obj_x - (-self.board_w / 2.0)) / max(0.01, self.board_w)
                     if cat == 1:
                         norm = 0.0 + 0.30 * norm_x
                     elif cat == 2:
@@ -506,15 +622,26 @@ class BlenderPCBAnimator:
                     else:
                         norm = 0.70 + 0.30 * norm_x
                 elif self.style == "vortex":
-                    dist = math.hypot(obj_x, obj_y)
-                    norm_r = dist / max(0.01, math.hypot(self.board_w / 2.0, self.board_h / 2.0))
-                    norm_x = (obj_x - (-self.board_w / 2.0)) / max(0.01, self.board_w)
                     norm = 0.6 * norm_x + 0.4 * norm_r
+                elif self.style == "scan":
+                    norm = 0.7 * norm_x + 0.3 * norm_y
+                elif self.style == "signal":
+                    stg = categorize_signal_stage(obj.name)
+                    if stg == 1:
+                        norm = 0.00 + 0.20 * norm_x
+                    elif stg == 2:
+                        norm = 0.25 + 0.22 * norm_x
+                    elif stg == 3:
+                        norm = 0.52 + 0.22 * norm_x
+                    else:
+                        norm = 0.78 + 0.22 * norm_x
+                elif self.style == "implode":
+                    norm = 1.0 - norm_r
                 else:
-                    norm = (obj_x - (-self.board_w / 2.0)) / max(0.01, self.board_w)
+                    norm = norm_x
 
                 norm = max(0.0, min(1.0, norm))
-                jitter = random.uniform(-4.0, 4.0)
+                jitter = 0.0 if self.style == "scan" else random.uniform(-4.0, 4.0)
 
                 if is_bottom:
                     if self.mode == "both":
@@ -531,9 +658,79 @@ class BlenderPCBAnimator:
             land_f = spawn_f + fall_frames
             bounce_f = land_f + bounce_frames
 
-            sign = -1.0 if is_bottom else 1.0
-            drop_height = max(0.05, min(0.12, self.board_w * 0.7))
+            # Estilo Implode: componentes já visíveis flutuando em constelação 3D antes de convergir
+            if self.style == "implode":
+                act_visible_start = 1 if is_bottom or self.mode != "both" else max(1, int(self.act2_end - 5))
+                for target_o in [obj] + list(obj.children_recursive):
+                    if act_visible_start > 1:
+                        target_o.hide_render = True
+                        target_o.keyframe_insert(data_path="hide_render", frame=1)
+                        target_o.keyframe_insert(data_path="hide_render", frame=act_visible_start - 1)
+                    target_o.hide_render = False
+                    target_o.keyframe_insert(data_path="hide_render", frame=act_visible_start)
 
+                angle = (idx * 2.39996) % (2.0 * math.pi)
+                radial_dist = max(0.03, self.board_w * (0.30 + 0.45 * ((idx * 7) % 11) / 10.0))
+                z_cloud = sign * drop_height * (0.45 + 0.65 * ((idx * 13) % 9) / 8.0)
+                cloud_loc = orig_loc + Vector((radial_dist * math.cos(angle), radial_dist * math.sin(angle), z_cloud))
+
+                obj.scale = orig_scale
+                obj.keyframe_insert(data_path="scale", frame=1)
+                obj.location = cloud_loc
+                obj.keyframe_insert(data_path="location", frame=1)
+                if int(spawn_f) > 1:
+                    drift_loc = cloud_loc + Vector((0, 0, sign * 0.006))
+                    obj.location = drift_loc
+                    obj.keyframe_insert(data_path="location", frame=int(spawn_f))
+
+                obj.location = orig_loc
+                obj.keyframe_insert(data_path="location", frame=int(land_f))
+
+                bounce_height = 0.0025
+                obj.location = orig_loc + Vector((0, 0, sign * bounce_height))
+                obj.keyframe_insert(data_path="location", frame=int((land_f + bounce_f) / 2.0))
+
+                obj.location = orig_loc
+                obj.keyframe_insert(data_path="location", frame=int(bounce_f))
+                obj.keyframe_insert(data_path="location", frame=self.total_frames)
+                continue
+
+            # Estilo Laser Scan: materialização holográfica rápida com overshoot elástico de escala
+            if self.style == "scan":
+                scan_pop_frames = max(3, int(0.11 * self.fps))
+                scan_settle_frames = max(6, int(0.22 * self.fps))
+                for target_o in [obj] + list(obj.children_recursive):
+                    target_o.hide_render = True
+                    target_o.keyframe_insert(data_path="hide_render", frame=1)
+                    if int(spawn_f - 1) > 1:
+                        target_o.keyframe_insert(data_path="hide_render", frame=int(spawn_f - 1))
+                    target_o.hide_render = False
+                    target_o.keyframe_insert(data_path="hide_render", frame=int(spawn_f))
+
+                obj.scale = Vector((0.001, 0.001, 0.001))
+                obj.keyframe_insert(data_path="scale", frame=1)
+                if int(spawn_f - 1) > 1:
+                    obj.keyframe_insert(data_path="scale", frame=int(spawn_f - 1))
+
+                obj.location = orig_loc + Vector((0, 0, sign * drop_height * 0.16))
+                obj.scale = orig_scale * 0.15
+                obj.keyframe_insert(data_path="location", frame=int(spawn_f))
+                obj.keyframe_insert(data_path="scale", frame=int(spawn_f))
+
+                obj.location = orig_loc
+                obj.scale = orig_scale * 1.18
+                obj.keyframe_insert(data_path="location", frame=int(spawn_f + scan_pop_frames))
+                obj.keyframe_insert(data_path="scale", frame=int(spawn_f + scan_pop_frames))
+
+                obj.location = orig_loc
+                obj.scale = orig_scale
+                obj.keyframe_insert(data_path="location", frame=int(spawn_f + scan_settle_frames))
+                obj.keyframe_insert(data_path="scale", frame=int(spawn_f + scan_settle_frames))
+                obj.keyframe_insert(data_path="location", frame=self.total_frames)
+                obj.keyframe_insert(data_path="scale", frame=self.total_frames)
+                continue
+
+            # Demais estilos (rain, radial, assembly, vortex, signal):
             # 1. Invisível desde o frame 1 até imediatamente antes do spawn (exclui do BVH do Cycles via hide_render)
             for target_o in [obj] + list(obj.children_recursive):
                 target_o.hide_render = True
@@ -554,6 +751,11 @@ class BlenderPCBAnimator:
                 v_radius = min(0.035, self.board_w * 0.3)
                 v_theta = 3.5 * math.pi
                 spawn_loc += Vector((v_radius * math.cos(v_theta), v_radius * math.sin(v_theta), 0))
+            elif self.style == "signal":
+                stg = categorize_signal_stage(obj.name)
+                if stg == 1:
+                    lat_dir = -1.0 if orig_loc.x < 0 else 1.0
+                    spawn_loc = orig_loc + Vector((lat_dir * self.board_w * 0.25, 0, sign * drop_height * 0.5))
 
             obj.location = spawn_loc
             obj.scale = orig_scale
@@ -579,7 +781,22 @@ class BlenderPCBAnimator:
     def render_single_frame(self, frame_idx, out_file):
         total_frames = self._calculate_timeline()
         if frame_idx is None or frame_idx < 0:
-            frame_idx = int(self.act3_end + (self.total_frames - self.act3_end) * 0.5) if self.mode != "bottom" else int(self.act1_end * 0.8)
+            if self.style == "exploded":
+                if self.mode == "bottom":
+                    frame_idx = int(self.act1_end * 0.52)
+                elif self.mode == "both":
+                    frame_idx = int(self.act2_end + (self.act3_end - self.act2_end) * 0.52)
+                else:
+                    frame_idx = int(self.act3_end * 0.52)
+            elif self.style == "implode":
+                if self.mode == "bottom":
+                    frame_idx = int(self.act1_end * 0.45)
+                elif self.mode == "both":
+                    frame_idx = int(self.act2_end + (self.act3_end - self.act2_end) * 0.45)
+                else:
+                    frame_idx = int(self.act3_end * 0.45)
+            else:
+                frame_idx = int(self.act3_end + (self.total_frames - self.act3_end) * 0.5) if self.mode != "bottom" else int(self.act1_end * 0.8)
 
         pbar = RenderProgressBar(1, prefix="Blender Preview")
         pbar.update(0, status="Configurando cena e shaders no Blender...")

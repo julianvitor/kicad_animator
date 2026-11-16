@@ -13,7 +13,8 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from core.config import (
-    KICAD_CLI, FFMPEG, RES_MAP, STYLE_DESCRIPTIONS, categorize_ref
+    KICAD_CLI, FFMPEG, RES_MAP, STYLE_DESCRIPTIONS,
+    categorize_ref, categorize_signal_stage
 )
 from core.progress import RenderProgressBar
 
@@ -118,14 +119,17 @@ class KiCadNativePCBAnimator:
                 self.spawn_timings[ref] = None
                 continue
 
+            norm_x = (fp["x"] - self.min_x) / max(1.0, self.board_width)
+            norm_y = (fp["y"] - self.min_y) / max(1.0, self.board_height)
+            dist = math.hypot(fp["x"] - self.center_x, fp["y"] - self.center_y)
+            norm_r = dist / max(1.0, self.max_radius)
+
             if self.style == "rain":
-                norm = (fp["x"] - self.min_x) / self.board_width
+                norm = norm_x
             elif self.style == "radial":
-                dist = math.hypot(fp["x"] - self.center_x, fp["y"] - self.center_y)
-                norm = dist / max(1.0, self.max_radius)
+                norm = norm_r
             elif self.style == "assembly":
                 cat = fp["category"]
-                norm_x = (fp["x"] - self.min_x) / self.board_width
                 if cat == 1:
                     norm = 0.0 + 0.30 * norm_x
                 elif cat == 2:
@@ -133,15 +137,28 @@ class KiCadNativePCBAnimator:
                 else:
                     norm = 0.70 + 0.30 * norm_x
             elif self.style == "vortex":
-                dist = math.hypot(fp["x"] - self.center_x, fp["y"] - self.center_y)
-                norm_r = dist / max(1.0, self.max_radius)
-                norm_x = (fp["x"] - self.min_x) / self.board_width
                 norm = 0.6 * norm_x + 0.4 * norm_r
+            elif self.style == "scan":
+                norm = 0.7 * norm_x + 0.3 * norm_y
+            elif self.style == "signal":
+                stg = categorize_signal_stage(ref)
+                if stg == 1:
+                    norm = 0.00 + 0.20 * norm_x
+                elif stg == 2:
+                    norm = 0.25 + 0.22 * norm_x
+                elif stg == 3:
+                    norm = 0.52 + 0.22 * norm_x
+                else:
+                    norm = 0.78 + 0.22 * norm_x
+            elif self.style == "implode":
+                norm = 1.0 - norm_r
+            elif self.style in ("exploded", "turntable"):
+                norm = 0.0
             else:
-                norm = (fp["x"] - self.min_x) / self.board_width
+                norm = norm_x
 
             norm = max(0.0, min(1.0, norm))
-            jitter = random.uniform(-5.0, 5.0)
+            jitter = 0.0 if self.style in ("scan", "exploded", "turntable") else random.uniform(-5.0, 5.0)
 
             if fp["layer"] == "B.Cu":
                 if self.mode == "both":
@@ -162,19 +179,63 @@ class KiCadNativePCBAnimator:
         ref = fp["ref"]
         spawn_f = self.spawn_timings.get(ref)
 
-        if spawn_f is None:
+        if spawn_f is None or self.style == "turntable":
+            return True, 0.0, 0.0, 0.0
+
+        is_bottom = fp["layer"] == "B.Cu"
+
+        if self.style == "exploded":
+            cat = fp["category"]
+            layer_h = 20.0 if cat == 1 else (38.0 if cat == 2 else 58.0)
+            if is_bottom:
+                t_start, t_end = 1, self.act1_end
+            else:
+                t_start = self.act2_end if self.mode == "both" else 1
+                t_end = self.act3_end
+            dur = max(10, t_end - t_start)
+            f_hold_start = t_start + 0.10 * dur
+            f_open = t_start + 0.38 * dur
+            f_hold_end = t_start + 0.68 * dur
+            f_close = t_start + 0.90 * dur
+            if frame_idx <= f_hold_start or frame_idx >= f_close:
+                return True, 0.0, 0.0, 0.0
+            elif frame_idx < f_open:
+                p = (frame_idx - f_hold_start) / max(1.0, f_open - f_hold_start)
+                return True, 0.0, 0.0, layer_h * p
+            elif frame_idx <= f_hold_end:
+                return True, 0.0, 0.0, layer_h
+            else:
+                p = 1.0 - (frame_idx - f_hold_end) / max(1.0, f_close - f_hold_end)
+                return True, 0.0, 0.0, layer_h * max(0.0, p)
+
+        if self.style == "implode":
+            act_visible_start = 1 if is_bottom or self.mode != "both" else max(1, int(self.act2_end - 5))
+            if frame_idx < act_visible_start:
+                return False, 0.0, 0.0, 0.0
+            idx_hash = sum(ord(c) for c in ref)
+            angle = (idx_hash * 2.39996) % (2.0 * math.pi)
+            r_cloud = 25.0 + (idx_hash % 15) * 1.5
+            z_cloud = 30.0 + (idx_hash % 11) * 2.5
+            if frame_idx <= spawn_f:
+                return True, r_cloud * math.cos(angle), r_cloud * math.sin(angle), z_cloud
+            df = frame_idx - spawn_f
+            fall_dur = int(0.33 * self.fps)
+            if df < fall_dur:
+                p = 1.0 - (df / float(fall_dur))
+                p2 = p * p
+                return True, r_cloud * math.cos(angle) * p2, r_cloud * math.sin(angle) * p2, z_cloud * p2
             return True, 0.0, 0.0, 0.0
 
         if frame_idx < spawn_f:
             return False, 0.0, 0.0, 0.0
 
         df = frame_idx - spawn_f
-        fall_dur = int(0.33 * self.fps)
-        bounce_dur = int(0.13 * self.fps)
+        fall_dur = int(0.16 * self.fps) if self.style == "scan" else int(0.33 * self.fps)
+        bounce_dur = int(0.10 * self.fps) if self.style == "scan" else int(0.13 * self.fps)
 
         if df < fall_dur:
             p = df / float(fall_dur)
-            z = 55.0 * (1.0 - p * p)
+            z = (15.0 if self.style == "scan" else 55.0) * (1.0 - p * p)
 
             if self.style == "vortex":
                 radius = 18.0 * (1.0 - p)
@@ -201,6 +262,18 @@ class KiCadNativePCBAnimator:
 
     def _get_frame_camera(self, frame):
         base_zoom = 1.18
+
+        if self.style == "turntable":
+            p = frame / max(1.0, float(self.total_frames))
+            rz = (26.0 + 360.0 * p) % 360.0
+            zm = base_zoom * (1.0 + 0.14 * math.sin(p * math.pi))
+            if self.mode == "both":
+                rx = 148.0 - 180.0 * (0.5 - 0.5 * math.cos(p * math.pi))
+            elif self.mode == "bottom":
+                rx = 148.0 - 8.0 * math.sin(p * math.pi)
+            else:
+                rx = -32.0 + 8.0 * math.sin(p * math.pi)
+            return rx, rz, zm
 
         if self.mode == "both":
             if frame < self.act1_end:
@@ -369,7 +442,22 @@ class KiCadNativePCBAnimator:
         try:
             self._calculate_timeline()
             if frame_idx is None or frame_idx < 0:
-                frame_idx = self.total_frames - int(0.5 * self.fps)
+                if self.style == "exploded":
+                    if self.mode == "bottom":
+                        frame_idx = int(self.act1_end * 0.52)
+                    elif self.mode == "both":
+                        frame_idx = int(self.act2_end + (self.act3_end - self.act2_end) * 0.52)
+                    else:
+                        frame_idx = int(self.act3_end * 0.52)
+                elif self.style == "implode":
+                    if self.mode == "bottom":
+                        frame_idx = int(self.act1_end * 0.45)
+                    elif self.mode == "both":
+                        frame_idx = int(self.act2_end + (self.act3_end - self.act2_end) * 0.45)
+                    else:
+                        frame_idx = int(self.act3_end * 0.45)
+                else:
+                    frame_idx = self.total_frames - int(0.5 * self.fps)
             frame_idx = max(0, min(frame_idx, self.total_frames - 1))
             pbar.update(0, status=f"Renderizando quadro {frame_idx} com KiCad Nativo...")
             print(f"📸 Renderizando quadro {frame_idx} com KiCad Nativo ({self.width}x{self.height})...", flush=True)

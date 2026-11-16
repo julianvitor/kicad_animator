@@ -49,7 +49,8 @@ if not getattr(sys, "frozen", False) and target_py and os.path.abspath(sys.execu
         sys.exit(subprocess.call([target_py, os.path.abspath(__file__)] + sys.argv[1:], cwd=script_dir))
 
 from core.config import (
-    KICAD_CLI, FFMPEG, BLENDER_BIN, UV_BIN, POETRY_BIN, HAS_BPY, STYLE_DESCRIPTIONS
+    KICAD_CLI, FFMPEG, BLENDER_BIN, UV_BIN, POETRY_BIN, HAS_BPY,
+    ALL_STYLES, STYLE_DESCRIPTIONS
 )
 from core.parser import PCBMetaParser
 from core.jobs import resolve_jobs, prompt_terminal_interactive
@@ -64,7 +65,7 @@ def main():
     parser = argparse.ArgumentParser(description="KiCad PCB Universal Assembly Animator (Blender & KiCad CLI)")
     parser.add_argument("--pcb", help="Caminho do arquivo .kicad_pcb")
     parser.add_argument("--backend", choices=["blender", "kicad"], default="blender", help="Motor de render: 'blender' (GPU PBR) ou 'kicad' (KiCad CLI raytracing)")
-    parser.add_argument("--style", choices=["rain", "radial", "assembly", "vortex", "all"], default="rain", help="Estilo da animação ou 'all' para gerar todos")
+    parser.add_argument("--style", choices=ALL_STYLES + ["all"], default="rain", help="Estilo da animação ou 'all' para gerar todos")
     parser.add_argument("--mode", choices=["both", "top", "bottom"], default="both", help="Faces a animar")
     parser.add_argument("--engine", choices=["eevee", "cycles"], default="eevee", help="Motor de renderização do Blender (padrão: eevee)")
     parser.add_argument("--samples", type=int, default=32, help="Número de amostras de render (samples)")

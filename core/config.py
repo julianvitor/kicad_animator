@@ -151,14 +151,29 @@ PYTHON_BIN = get_best_python()
 # ---------------------------------------------------------------------------
 # Estilos de Animação e Descrições
 # ---------------------------------------------------------------------------
-ALL_STYLES = ["rain", "radial", "assembly", "vortex"]
+ALL_STYLES = [
+    "rain",
+    "radial",
+    "assembly",
+    "vortex",
+    "exploded",
+    "scan",
+    "implode",
+    "turntable",
+    "signal"
+]
 
 STYLE_DESCRIPTIONS = {
     "rain": "Chuva Linear Gravitacional (Rain)",
     "radial": "Onda Radial do Centro (Ripple)",
     "assembly": "Linha de Montagem SMT por Categoria (Pick-and-Place)",
     "vortex": "Vórtice Magnético Espiral 3D (Vortex)",
-    "all": "Todos os 4 Estilos em Lote (All)"
+    "exploded": "Visão Explodida Técnica em Camadas (Exploded View)",
+    "scan": "Varredura Laser Sci-Fi (Laser Scan)",
+    "implode": "Implosão Magnética / Constelação 3D (Magnetic Implode)",
+    "turntable": "Showcase Cinemático 360° (Turntable Macro)",
+    "signal": "Fluxo de Energia e Sinal (Signal Flow)",
+    "all": "Todos os 9 Estilos em Lote (All)"
 }
 
 RES_MAP = {
@@ -175,14 +190,26 @@ ICS_PREFIXES = ("U", "IC", "Q", "T", "M", "MOD", "VR")
 MECH_PREFIXES = ("J", "P", "TB", "SW", "BZ", "SPK", "F", "DISP", "OLED", "K")
 
 def categorize_ref(ref):
-    """Categoriza o componente em: 1=passivo, 2=CI/semicondutor, 3=mecânico/conector."""
-    clean_ref = ref.upper()
+    """Categoriza o componente (por designador ou nome do modelo 3D) em:
+    1 = passivo / discreto baixo (R, C, L, D, LED)
+    2 = semicondutor / CI / módulo / display (U, IC, Q, TO-220, TO-92, OLED, MOD, VR)
+    3 = conector / mecânico alto (J, P, TB, TerminalBlock, JST, PinSocket, USB, SW, Buzzer)
+    """
+    clean = ref.upper()
+    # Verificação por palavras-chave de pacotes 3D do KiCad
+    if any(k in clean for k in ("TERMINALBLOCK", "JST_", "PINSOCKET", "PINHEADER", "USB_", "KEYSTONE", "BUZZER", "SW_PUSH", "CONN_", "JACK", "HEADER")):
+        return 3
+    if any(k in clean for k in ("TO-220", "TO-92", "TO-252", "TO-263", "SOIC", "TSSOP", "QFP", "QFN", "BGA", "DIP-", "OLED", "DISP", "ESP32", "MODULE")):
+        return 2
+    if any(k in clean for k in ("R_AXIAL", "R_SMD", "C_DISC", "C_SMD", "CP_RADIAL", "D_DO", "D_SMD", "LED_", "L_AXIAL", "L_SMD", "INDUCTOR")):
+        return 1
+
     for p in ("LED", "DISP", "OLED", "TB", "SPK", "MOD", "VR"):
-        if clean_ref.startswith(p):
+        if clean.startswith(p):
             if p in ("LED",): return 1
-            if p in ("MOD", "VR"): return 2
+            if p in ("MOD", "VR", "OLED", "DISP"): return 2
             return 3
-    m = re.match(r"^([A-Z]+)", clean_ref)
+    m = re.match(r"^([A-Z]+)", clean)
     if not m:
         return 3
     prefix = m.group(1)
@@ -191,3 +218,41 @@ def categorize_ref(ref):
     if prefix in ICS_PREFIXES:
         return 2
     return 3
+
+def categorize_signal_stage(ref):
+    """Categoriza na ordem do fluxo elétrico (suporta designadores e nomes de malhas 3D):
+    1 = Entrada/Conectores/Chaves (J, P, TB, TerminalBlock, JST, USB, SW)
+    2 = Reguladores/Potência/Filtragem (VR, TO-220, TO-92, L, C, D)
+    3 = Processamento/CIs/Módulos/Sockets (U, IC, MOD, PinSocket, OLED)
+    4 = Sinais/Resistores/Sensores/Indicadores (R, LED, Buzzer)
+    """
+    clean = ref.upper()
+    if any(k in clean for k in ("TERMINALBLOCK", "JST_", "USB_", "KEYSTONE", "SW_PUSH", "CONN_")):
+        return 1
+    if any(k in clean for k in ("TO-220", "TO-92", "CP_RADIAL", "C_DISC", "C_SMD", "D_DO", "D_SMD", "L_")):
+        return 2
+    if any(k in clean for k in ("PINSOCKET", "PINHEADER", "SOIC", "QFP", "QFN", "DIP", "ESP32", "OLED", "DISP", "MODULE")):
+        return 3
+    if any(k in clean for k in ("R_AXIAL", "R_SMD", "LED_", "BUZZER", "SPK")):
+        return 4
+
+    for p, stg in (
+        ("TB", 1), ("CON", 1), ("USB", 1), ("SW", 1),
+        ("VR", 2), ("FB", 2),
+        ("MOD", 3), ("IC", 3), ("XTAL", 3), ("OLED", 3), ("DISP", 3),
+        ("LED", 4), ("BZ", 4), ("SPK", 4), ("RN", 4), ("RV", 4), ("TP", 4)
+    ):
+        if clean.startswith(p):
+            return stg
+
+    m = re.match(r"^([A-Z]+)", clean)
+    if not m:
+        return 1
+    prefix = m.group(1)
+    if prefix in ("J", "P", "F", "K", "BT"):
+        return 1
+    if prefix in ("L", "C", "D", "Q", "T"):
+        return 2
+    if prefix in ("U", "M", "Y", "X"):
+        return 3
+    return 4
