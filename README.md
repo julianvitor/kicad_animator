@@ -1,130 +1,125 @@
 # KiCad Animator (3D Studio)
 
-Gerador universal e cinemático de animações 3D para circuitos impressos projetados no KiCad (KiCad 7, 8, 9 e 10).
+> **Universal 3D cinematic animation studio for KiCad printed circuit boards (KiCad 7, 8, 9 & 10).**
 
 <p align="center">
-  <img src="docs/assets/demo_jardim.gif" alt="Animação 3D da PCB Jardim - Chuva Gravitacional" width="100%">
+  <img src="docs/assets/demo_jardim.gif" alt="KiCad Animator 3D Demo" width="100%">
 </p>
 
-Possui dois motores de renderização integrados:
-1. **Blender 3D (GPU PBR)**: Renderização com materiais realistas, iluminação de estúdio profissional com color grading AgX e animação procedural de componentes (chuva gravitacional, onda radial, montagem SMT, vórtice 3D).
-2. **KiCad Nativo (CPU)**: Renderizador interno via `kicad-cli` com raytracing multi-core paralelo (sem necessidade de Blender instalado).
-
-Compatível com **Linux**, **Windows** e **macOS**.
-
----
-
-## 🖥️ Interface Gráfica Studio
-
-A aplicação conta com uma interface desktop moderna em modo escuro com pré-visualização em tempo real, monitoramento de progresso, console integrado e detecção automática de aceleração por hardware (GPU Metal / OptiX / CUDA):
-
 <p align="center">
-  <img src="docs/assets/ui_studio.png" alt="KiCad Animator 3D Studio - Interface Desktop" width="100%">
+  <a href="#-english"><b>English</b></a> • <a href="#-português"><b>Português</b></a>
 </p>
 
 ---
 
-## 📦 Executáveis Prontos (Standalone)
+## 🌐 English
 
-Você pode baixar a versão compilada diretamente da aba [Releases](https://github.com/julianvitor/kicad_animator/releases):
-- **Windows (x64)**: `KiCad-Animator-Windows-x64.zip` (extraia e execute `KiCad-Animator.exe`)
-- **macOS (Apple Silicon & Intel)**: `KiCad-Animator-macOS.zip` (extraia e execute `KiCad-Animator.app`)
+Universal tool for generating 3D cinematic PCB animations directly from KiCad projects:
+- **Blender 3D (GPU PBR)**: Photorealistic materials, AgX studio lighting, and procedural component animations (*Rain*, *Radial Wave*, *SMT Assembly*, *Vortex*).
+- **KiCad Native (CPU)**: Built-in raytracing via `kicad-cli` with multi-core parallel rendering (no Blender installation required).
+- **Cross-Platform**: Linux, Windows, and macOS.
 
-> **Dica Windows:** Se extrair pelo Windows Explorer e o Windows bloquear arquivos baixados da internet, execute `Get-ChildItem -Recurse | Unblock-File` no PowerShell dentro da pasta extraída.
+<p align="center">
+  <img src="docs/assets/ui_studio.png" alt="KiCad Animator Desktop UI" width="100%">
+</p>
 
-### Gerar Executável Localmente
+### 📦 Standalone Binaries (Pre-built)
 
-- **Windows:** `.\package_windows.ps1`
-- **macOS:** `./package_mac.sh`
+Download ready-to-run executables from [Releases](https://github.com/julianvitor/kicad_animator/releases):
+- **Windows (x64)**: `KiCad-Animator-Windows-x64.zip` (`KiCad-Animator.exe`)
+- **macOS (Apple Silicon & Intel)**: `KiCad-Animator-macOS.zip` (`KiCad-Animator.app`)
 
----
+*Build locally:* `.\package_windows.ps1` (Windows) or `./package_mac.sh` (macOS).
 
-## 🚀 Inicialização em 1 Clique (Código-Fonte)
+### 🚀 1-Click Launch (From Source)
 
-Para não precisar digitar comandos ou instalar manualmente dependências e Poetry, use o inicializador correspondente ao seu sistema operacional:
+Automatically checks Python, installs Poetry & dependencies, and launches the application:
+- **Linux / macOS**: `./run_unix.sh`
+- **Windows**: `.\run_windows.ps1` (or double-click `run_windows.bat`)
 
-### Linux e macOS
-```bash
-./run_unix.sh
-```
+### 💻 Usage
 
-### Windows (PowerShell ou Clique Duplo)
-```powershell
-.\run_windows.ps1
-```
-*(ou simplesmente dê um duplo clique no arquivo `run_windows.bat`).*
-
-> Ambos os scripts detectam a versão adequada do Python, instalam o Poetry automaticamente se necessário, instalam todas as dependências do projeto e abrem a aplicação de imediato.
-
----
-
-## 🛠️ Modos de Execução Manual (Poetry / Python)
-
-### Usando Poetry (Recomendado)
-```bash
-# 1. Instalar as dependências do projeto
-poetry install
-
-# 2. Executar o aplicativo (abre a interface gráfica)
-poetry run kicad-animator
-# ou:
-poetry run python main.py
-```
-
-### Opcional: Instalar com suporte ao pacote `bpy` no Python
-Caso queira usar o motor Blender sem necessitar de um executável externo do Blender instalado:
-```bash
-poetry install --extras blender
-```
-
-### Usando Python diretamente
-```bash
-# Executa a aplicação a partir de main.py
-python main.py
-```
-
----
-
-## 💻 Modos de Uso
-
-### 1. Interface Gráfica Desktop (Padrão)
-Abre o aplicativo nativo com preview em tempo real, console de execução e barra de progresso:
+#### Desktop GUI
 ```bash
 poetry run kicad-animator
-# ou:
-python main.py
+# or: python main.py
 ```
 
-### 2. Linha de Comando (Headless / Scripts / CI)
+#### Command Line (CLI / Headless / CI)
 ```bash
-# Renderizar animação estilo Chuva (Rain) com motor Blender GPU
-poetry run kicad-animator --pcb minha_placa.kicad_pcb --backend blender --style rain --res 1080p
+# Blender GPU render (Rain style, 1080p)
+poetry run kicad-animator --pcb board.kicad_pcb --backend blender --style rain --res 1080p
 
-# Renderizar com motor KiCad Nativo (CPU raytracing com 8 núcleos)
-poetry run kicad-animator --pcb minha_placa.kicad_pcb --backend kicad --workers 8 --res 1080p
+# KiCad Native CPU render (8 parallel workers, 1080p)
+poetry run kicad-animator --pcb board.kicad_pcb --backend kicad --workers 8 --res 1080p
 
-# Renderizar apenas 1 quadro estático para pré-visualização rápida
-poetry run kicad-animator --pcb minha_placa.kicad_pcb --still-frame 90 -o preview.png
-```
+# Single still-frame preview
+poetry run kicad-animator --pcb board.kicad_pcb --still-frame 90 -o preview.png
 
-### 3. Modo Interativo no Terminal
-```bash
+# Interactive terminal mode
 poetry run kicad-animator -i
-# ou:
-python main.py -i
 ```
+
+### 🛠️ System Requirements
+
+| Tool | Windows | Linux | macOS |
+|------|---------|-------|-------|
+| **KiCad** (`kicad-cli`) | Default path / `PATH` | `/usr/bin/kicad-cli` / `PATH` | `/Applications/KiCad/...` / `PATH` |
+| **FFmpeg** | `PATH` | `apt` / `pacman` / `PATH` | `brew install ffmpeg` / `PATH` |
+| **Blender** *(optional)* | Default path / `PATH` | `snap` / `flatpak` / `PATH` | `/Applications/Blender.app` / `PATH` |
+| **Python** *(source only)* | `3.11` – `3.13` | `3.11` – `3.13` | `3.11` – `3.13` |
 
 ---
 
-## 🛠️ Pré-requisitos do Sistema
+## 🌐 Português
 
-O KiCad Animator detecta automaticamente as ferramentas em seus caminhos padrão em cada sistema operacional:
+Gerador universal e cinemático de animações 3D para placas de circuito impresso do KiCad:
+- **Blender 3D (GPU PBR)**: Materiais realistas, iluminação de estúdio AgX e animações procedurais (*Chuva*, *Onda Radial*, *Montagem SMT*, *Vórtice*).
+- **KiCad Nativo (CPU)**: Raytracing multi-core paralelo via `kicad-cli` (dispensa instalação do Blender).
+- **Multiplataforma**: Linux, Windows e macOS.
+
+### 📦 Executáveis Prontos (Standalone)
+
+Baixe executáveis compilados na aba [Releases](https://github.com/julianvitor/kicad_animator/releases):
+- **Windows (x64)**: `KiCad-Animator-Windows-x64.zip` (`KiCad-Animator.exe`)
+- **macOS (Apple Silicon & Intel)**: `KiCad-Animator-macOS.zip` (`KiCad-Animator.app`)
+
+*Gerar executável localmente:* `.\package_windows.ps1` (Windows) ou `./package_mac.sh` (macOS).
+
+### 🚀 Inicialização em 1 Clique (Código-Fonte)
+
+Verifica o Python, instala o Poetry e as dependências e abre a aplicação automaticamente:
+- **Linux / macOS**: `./run_unix.sh`
+- **Windows**: `.\run_windows.ps1` (ou clique duplo em `run_windows.bat`)
+
+### 💻 Modos de Uso
+
+#### Interface Desktop (GUI)
+```bash
+poetry run kicad-animator
+# ou: python main.py
+```
+
+#### Linha de Comando (CLI / CI)
+```bash
+# Renderizar via Blender GPU (Estilo Chuva, 1080p)
+poetry run kicad-animator --pcb placa.kicad_pcb --backend blender --style rain --res 1080p
+
+# Renderizar via KiCad Nativo CPU (8 workers, 1080p)
+poetry run kicad-animator --pcb placa.kicad_pcb --backend kicad --workers 8 --res 1080p
+
+# Pré-visualização de 1 quadro estático
+poetry run kicad-animator --pcb placa.kicad_pcb --still-frame 90 -o preview.png
+
+# Modo interativo no terminal
+poetry run kicad-animator -i
+```
+
+### 🛠️ Pré-requisitos do Sistema
 
 | Ferramenta | Windows | Linux | macOS |
 |------------|---------|-------|-------|
-| **KiCad** (`kicad-cli`) | `C:\Program Files\KiCad\*\bin\kicad-cli.exe` ou `PATH` | `/usr/bin/kicad-cli` ou `PATH` | `/Applications/KiCad/KiCad.app/...` ou `PATH` |
-| **FFmpeg** | `C:\ffmpeg\bin\ffmpeg.exe` ou `PATH` | `/usr/bin/ffmpeg` ou `PATH` | `brew install ffmpeg` ou `PATH` |
-| **Blender** *(opcional)* | `C:\Program Files\Blender Foundation\Blender*\blender.exe` | `/usr/bin/blender` ou `snap/flatpak` | `/Applications/Blender.app` ou `PATH` |
-| **Python** *(código-fonte)* | `3.11`, `3.12` ou `3.13` (Recomendado: `3.13`) | `3.11`, `3.12` ou `3.13` (Recomendado: `3.13`) | `3.11`, `3.12` ou `3.13` (Recomendado: `3.13`) |
-
-> ⚠️ **Atenção sobre o Python:** Para executar a partir do código-fonte ou inicializadores (`run_windows.bat`, `run_unix.sh`), utilize o **Python 3.11, 3.12 ou 3.13**. O **Python 3.14+ ainda não possui suporte** pelo módulo oficial do Blender (`bpy`). Nos executáveis standalone prontos da aba Releases, o Python 3.13 e o Blender já vêm embutidos.
+| **KiCad** (`kicad-cli`) | Caminho padrão / `PATH` | `/usr/bin/kicad-cli` / `PATH` | `/Applications/KiCad/...` / `PATH` |
+| **FFmpeg** | `PATH` | `apt` / `pacman` / `PATH` | `brew install ffmpeg` / `PATH` |
+| **Blender** *(opcional)* | Caminho padrão / `PATH` | `snap` / `flatpak` / `PATH` | `/Applications/Blender.app` / `PATH` |
+| **Python** *(código-fonte)* | `3.11` a `3.13` | `3.11` a `3.13` | `3.11` a `3.13` |
